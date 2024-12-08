@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Gets the current full configuration
+  Gets a PowerStub configuration value by key.
 
 .DESCRIPTION
 
@@ -18,14 +18,10 @@ None. You cannot pipe objects to this function.
 #>
 
 
-function Get-PowerStubConfiguration {
+function Get-PowerStubConfigurationKey {
     param (
         [string] $key
     )
     
-    if ($key) {
-        return $Script:PSTBSettings.$key
-    }
- 
-    return $Script:PSTBSettings
+    return $Script:PSTBSettings.$key
 }

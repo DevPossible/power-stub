@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Creates a new PowerStub command in the specified PowerStub Collection.
+  Executes a stubbed element.
 
 .DESCRIPTION
 
@@ -20,7 +20,7 @@ None. You cannot pipe objects to Invoke-Authenticate.
 
 function Invoke-PowerStubCommand {
     param(
-        [string]$collection,
+        [string]$stub,
         [string]$command
     )
    

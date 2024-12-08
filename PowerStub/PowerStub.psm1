@@ -1,10 +1,4 @@
-$Script:PSTBSettings = @{
-    'ModulePath'         = $PSScriptRoot
-    'ConfigFile'         = Join-Path $PSScriptRoot 'PowerStub.json'
-    'InternalConfigKeys' = @('InternalConfigKeys', 'ModulePath', 'ConfigFile')
-    'InvokeAlias'        = 'pstb'
-    'Collections'        = @{}
-}
+$Script:ModulePath = $PSScriptRoot
 
 Write-Verbose "Initializing PowerStub"
 
@@ -30,21 +24,18 @@ Write-Verbose 'Dot-sourcing functions'
 ($publicFn + $privateFn) | ForEach-Object -Process { Write-Verbose $_.FullName; . $_.FullName }
 
 #load the configuration
+$Script:PSTBSettings = Get-PowerStubConfigurationDefaults
 Import-PowerStubConfiguration
 
 #export public functions only
-
-# helper functions
 [string[]]$exports = @($publicFn | Select-Object -ExpandProperty BaseName)
 Write-Verbose "Exporting $($exports.Count) functions"
 Export-ModuleMember -Function $exports
 
-# stub functions
-#Export-ModuleMember -Function 'Invoke-PowerStubCommand'
-New-Alias $Script:PSTBSettings['InvokeAlias'] Invoke-PowerStubCommand
-Export-ModuleMember -Alias $Script:PSTBSettings['InvokeAlias']
+# setup and export the main alias
+$alias = Get-PowerStubConfigurationKey 'InvokeAlias'
+Write-Verbose "Creating Invoke-PowerStubCommand alias as: $alias"
+New-Alias $alias Invoke-PowerStubCommand
+Export-ModuleMember -Alias $alias
 
-# management functions
-#Export-ModuleMember -Function 'New-PowerStubCollection'
-#Export-ModuleMember -Function 'New-PowerStubCommand'
 Write-Verbose "PowerStub module loaded."

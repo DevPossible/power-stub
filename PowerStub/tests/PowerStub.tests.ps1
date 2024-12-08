@@ -27,22 +27,31 @@ Describe "Execute-PowerStubCommand" {
             $(& Get-PowerStubConfiguration "ModulePath") | Out-Null
         }
 
-        It "Should export on new collection" {
+        It "Should export on new stub" {
             $configFile = $config['ConfigFile']
             $configFileBackup = $config['ConfigFile'] + ".bak"
 
             if (Test-Path $configFile) {
                 Copy-Item $configFile $configFileBackup -Force
                 Remove-Item $configFile -Force
+                Import-PowerStubConfiguration -reset
             }
 
-            $testingPath = Join-Path $env:TEMP "PowerStubTesting"
-            $(& New-PowerStubCollection "PowerStubTesting" $testingPath) | Out-Null
-            Test-Path $configFile | Should be $true
-
-            if (Test-Path $configFileBackup) {
-                Copy-Item $configFileBackup $configFile -Force
-                Remove-Item $configFileBackup -Force
+            try {
+                $testingPath = Join-Path $env:TEMP "PowerStubTesting"
+                $(& New-PowerStub "PowerStubTesting" $testingPath) | Out-Null
+                Test-Path $configFile | Should be $true
+                
+                $config = Get-PowerStubConfiguration
+                $config.Stubs | Should Not Be $null
+                $config.Stubs.Keys.Count | Should Be 1
+            }
+            finally {
+                if (Test-Path $configFileBackup) {
+                    Copy-Item $configFileBackup $configFile -Force
+                    Remove-Item $configFileBackup -Force
+                }
+                Import-PowerStubConfiguration
             }
         }
 

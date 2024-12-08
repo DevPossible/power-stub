@@ -19,8 +19,8 @@ None. You cannot pipe objects to this function.
 
 
 function Export-PowerStubConfiguration {
-    $noExport = $Script:PSTBSettings['InternalConfigKeys']
-    $fileName = $Script:PSTBSettings['ConfigFile']
+    $noExport = Get-PowerStubConfigurationKey 'InternalConfigKeys'
+    $fileName = Get-PowerStubConfigurationKey 'ConfigFile'
     $exportConfig = @{}
     foreach ($key in $Script:PSTBSettings.Keys) {
         #do not export values for internal keys
