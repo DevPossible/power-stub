@@ -38,6 +38,7 @@
   <ItemGroup>
     <Compile Include="private\functions\Get-PowerStubConfigurationKey.ps1" />
     <Compile Include="private\functions\Get-PowerStubConfigurationDefaults.ps1" />
+    <Compile Include="private\functions\ConvertTo-Hashtable.ps1" />
     <Compile Include="private\functions\Set-PowerStubConfiguration.ps1" />
     <Compile Include="private\functions\Set-PowerStubConfigurationKey.ps1" />
     <Compile Include="private\functions\Find-PowerStubCommands.ps1" />

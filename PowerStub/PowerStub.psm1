@@ -38,4 +38,35 @@ Write-Verbose "Creating Invoke-PowerStubCommand alias as: $alias"
 New-Alias $alias Invoke-PowerStubCommand
 Export-ModuleMember -Alias $alias
 
+#setup the Invoke-PowerStubCommand argument completer for the stub parameter
+Write-Verbose "Setting up argument completer for Invoke-PowerStubCommand stub parameter"
+$CommandStubCompleter = {
+    param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameter)
+    return "test", "test2", "other"
+    $stubObj = Get-PowerStubConfigurationKey 'Stubs'
+    $stubs = $stubObj.Keys
+    if (!$stringMatch) { 
+        return $stubs | ForEach-Object {
+            New-Object -Type System.Management.Automation.CompletionResult -ArgumentList @(
+                $_          # completionText
+                $_          # listItemText
+                'ParameterValue' # resultType
+                $_          # toolTip
+            )
+        }
+    }
+    
+    $PartialMatches = $stubs | Where-Object { $_ -Match $stringMatch } 
+    return $PartialMatches | ForEach-Object {
+        New-Object -Type System.Management.Automation.CompletionResult -ArgumentList @(
+            $_          # completionText
+            $_          # listItemText
+            'ParameterValue' # resultType
+            $_          # toolTip
+        )
+    }
+}
+
+Register-ArgumentCompleter -CommandName Invoke-PowerStubCommand -ParameterName Stub -ScriptBlock $CommandStubCompleter
+
 Write-Verbose "PowerStub module loaded."

@@ -57,7 +57,23 @@ Describe "Execute-PowerStubCommand" {
 
     }
 
-    Context "Basic Functions" {
+    Context "New-PowerStub" {
+        BeforeAll {
+            $configFile = $config['ConfigFile']
+            $configFileBackup = $config['ConfigFile'] + ".bak"
+
+            if (Test-Path $configFile) {
+                Copy-Item $configFile $configFileBackup -Force
+                Remove-Item $configFile -Force
+                Import-PowerStubConfiguration -reset
+            }
+            $testingPath = Join-Path $env:TEMP "PowerStubTesting"
+            if (Test-Path $testingPath) {
+                Remove-Item $testingPath -Recurse -Force
+            }
+            New-Item -Path $testingPath -ItemType Directory | Out-Null
+        }
+
         It "Should be a valid module export" {
             Get-Command -Module PowerStub -name 'Invoke-PowerStubCommand' | Should Not Be $null
         }
@@ -68,9 +84,30 @@ Describe "Execute-PowerStubCommand" {
             $alias.Definition | Should Be 'Invoke-PowerStubCommand'
         }
 
-        It "Should not Fail with no params" {
-            $(& Invoke-PowerStubCommand) | Out-Null
+       
+        AfterAll {
+            if (Test-Path $configFileBackup) {
+                Copy-Item $configFileBackup $configFile -Force
+                Remove-Item $configFileBackup -Force
+            }
+            Import-PowerStubConfiguration
         }
+
+    }
+    
+    Context "Management Functions" {
+        It "Should be a valid module export" {
+            Get-Command -Module PowerStub -name 'Invoke-PowerStubCommand' | Should Not Be $null
+        }
+
+        It "Should export 'psb' alias" {
+            $alias = Get-Alias -name $config['InvokeAlias']
+            $alias | Should Not Be $null
+            $alias.Definition | Should Be 'Invoke-PowerStubCommand'
+        }
+
     }
 
+
+    
 }

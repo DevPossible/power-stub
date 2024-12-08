@@ -17,12 +17,32 @@ None. You cannot pipe objects to Invoke-Authenticate.
 
 #>
 
-
 function Invoke-PowerStubCommand {
+    [CmdletBinding()]
     param(
-        [string]$stub,
-        [string]$command
+        [parameter(Mandatory = $false, Position = 0)]
+        [string] $stub,
+        [parameter(Mandatory = $false, Position = 1)]
+        [string] $command
     )
+
+    if (!$command) {
+        $stubs = Get-PowerStubConfiguration Stubs
+        return $stubs.Keys
+    }
    
-    Write-Host $myinvocation.line
+    if (!$command) {
+        Find-PowerStubCommands $stub
+    }
+    
+    $line = $myinvocation.line
+    Write-Host "line: $line"
+    Write-Host "stub: $stub"
+    Write-Host "command: $command"    
+    
+    $srch = "$stub $command"
+    $i = $line.IndexOf($srch)
+    $arguments = $line.Substring($i + $srch.Length).Trim()
+        
+    Write-Host "arguments: $arguments"
 }

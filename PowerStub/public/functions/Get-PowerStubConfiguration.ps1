@@ -24,7 +24,7 @@ function Get-PowerStubConfiguration {
     )
     
     if ($key) {
-        return $Script:PSTBSettings.$key
+        return $Script:PSTBSettings[$key]
     }
  
     return $Script:PSTBSettings

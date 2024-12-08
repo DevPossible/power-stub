@@ -24,6 +24,6 @@ function Set-PowerStubConfigurationKey {
         $value
     )
     
-    $Script:PSTBSettings.$key = $value
+    $Script:PSTBSettings[$key] = $value
     Export-PowerStubConfiguration    
 }

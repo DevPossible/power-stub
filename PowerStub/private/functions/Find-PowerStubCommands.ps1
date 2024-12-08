@@ -24,7 +24,14 @@ function Find-PowerStubCommands {
     $beta = Get-PowerStubConfigurationKey 'EnableFolder:Beta'
     $draft = Get-PowerStubConfigurationKey 'EnableFolder:Drafts'
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    $stubRoot = $stubs[$stub]
+    $stubRoot = $stubs.$stub
+    
+    if (!$stubRoot) {
+        Write-Warning "Stub '$stub' not found in the configuration."
+        return
+    }
+    
+    Write-Verbose "Finding commands for stub '$stub' in '$stubRoot'."
     
     $commands = Get-ChildItem -Path $stubRoot -Recurse -Include *.ps1
     if ($beta -eq $false) {
@@ -33,5 +40,5 @@ function Find-PowerStubCommands {
     if ($draft -eq $false) {
         $commands = $commands | Where-Object { $_.FullName -notmatch "\.draft" }
     }
-    return $commands
+    return $commands | Select-Object -ExpandProperty FullName
 }

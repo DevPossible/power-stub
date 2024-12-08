@@ -37,12 +37,12 @@ function Import-PowerStubConfiguration {
     
     Write-Verbose "Importing File: $fileName"
     if (Test-Path $fileName) {
-        $newConfig = Get-Content -Path $fileName -Raw | ConvertFrom-Json
-        foreach ($key in $newConfig.psobject.Properties.name) {
+        $newConfig = Get-Content -Path $fileName -Raw | ConvertFrom-Json | ConvertTo-Hashtable
+        foreach ($key in $newConfig.Keys) {
             #do not import values for internal keys
             if ($noImport -contains $key) { continue }
             Write-Verbose "Importing Configuration Key: $key"
-            $Script:PSTBSettings.$key = $newConfig.$key
+            $Script:PSTBSettings[$key] = $newConfig[$key]
         }
     }
     else {
