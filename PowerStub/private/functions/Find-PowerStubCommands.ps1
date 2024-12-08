@@ -31,8 +31,6 @@ function Find-PowerStubCommands {
         return
     }
     
-    Write-Verbose "Finding commands for stub '$stub' in '$stubRoot'."
-    
     $commands = Get-ChildItem -Path $stubRoot -Recurse -Include *.ps1
     if ($beta -eq $false) {
         $commands = $commands | Where-Object { $_.FullName -notmatch "\.beta" }
@@ -40,5 +38,5 @@ function Find-PowerStubCommands {
     if ($draft -eq $false) {
         $commands = $commands | Where-Object { $_.FullName -notmatch "\.draft" }
     }
-    return $commands | Select-Object -ExpandProperty FullName
+    return $commands
 }

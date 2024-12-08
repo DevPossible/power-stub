@@ -32,7 +32,7 @@ function Invoke-PowerStubCommand {
     }
    
     if (!$command) {
-        Find-PowerStubCommands $stub
+        Find-PowerStubCommands $stub | Select-Object -ExpandProperty FullName
     }
     
     $line = $myinvocation.line

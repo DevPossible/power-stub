@@ -38,35 +38,35 @@ Write-Verbose "Creating Invoke-PowerStubCommand alias as: $alias"
 New-Alias $alias Invoke-PowerStubCommand
 Export-ModuleMember -Alias $alias
 
-#setup the Invoke-PowerStubCommand argument completer for the stub parameter
-Write-Verbose "Setting up argument completer for Invoke-PowerStubCommand stub parameter"
-$CommandStubCompleter = {
-    param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameter)
-    return "test", "test2", "other"
-    $stubObj = Get-PowerStubConfigurationKey 'Stubs'
-    $stubs = $stubObj.Keys
-    if (!$stringMatch) { 
-        return $stubs | ForEach-Object {
-            New-Object -Type System.Management.Automation.CompletionResult -ArgumentList @(
-                $_          # completionText
-                $_          # listItemText
-                'ParameterValue' # resultType
-                $_          # toolTip
-            )
-        }
-    }
+#setup the Invoke-PowerStubCommand argument completer for the STUB parameter
+Write-Verbose "Setting up argument completer for Invoke-PowerStubCommand STUB parameter"
+$StubCompleter = {
+    param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameters)
+    $stubs = Get-PowerStubConfigurationKey 'Stubs'
+    if (!$stringMatch) { return @($stubs.Keys) }
     
-    $PartialMatches = $stubs | Where-Object { $_ -Match $stringMatch } 
-    return $PartialMatches | ForEach-Object {
-        New-Object -Type System.Management.Automation.CompletionResult -ArgumentList @(
-            $_          # completionText
-            $_          # listItemText
-            'ParameterValue' # resultType
-            $_          # toolTip
-        )
-    }
+    $PartialMatches = @($stubs.Keys | Where-Object { $_ -like "$stringMatch*" }) 
+    return $PartialMatches
 }
 
-Register-ArgumentCompleter -CommandName Invoke-PowerStubCommand -ParameterName Stub -ScriptBlock $CommandStubCompleter
+Register-ArgumentCompleter -CommandName Invoke-PowerStubCommand -ParameterName Stub -ScriptBlock $StubCompleter
+
+#setup the Invoke-PowerStubCommand argument completer for the COMMAND parameter
+Write-Verbose "Setting up argument completer for Invoke-PowerStubCommand COMMAND parameter"
+$CommandCompleter = {
+    param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameters)
+    
+    $stub = $fakeBoundParameters['Stub']
+    $commands = @(Find-PowerStubCommands $stub)
+    if (!$commands) { Write-Warning "Stub $stub has no commands." }
+    $commandNames = @($commands | Select-Object -ExpandProperty BaseName)
+    
+    if (!$stringMatch) { return $commandNames }
+        
+    $PartialMatches = $commandNames | Where-Object { $_ -like "$stringMatch*" } 
+    return $PartialMatches 
+}
+
+Register-ArgumentCompleter -CommandName Invoke-PowerStubCommand -ParameterName Command -ScriptBlock $CommandCompleter
 
 Write-Verbose "PowerStub module loaded."
