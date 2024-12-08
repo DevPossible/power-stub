@@ -14,6 +14,40 @@ Import-Module $modulePath -Force -Verbose
 $config = Get-PowerStubConfiguration
 
 Describe "Execute-PowerStubCommand" {
+    Context "Configuration" {
+        It "Should be a valid module export" {
+            Get-Command -Module PowerStub -name 'Get-PowerStubConfiguration' | Should Not Be $null
+        }
+
+        It "Should not Fail with no params" {
+            $(& Get-PowerStubConfiguration) | Out-Null
+        }
+
+        It "Should not Fail with a key" {
+            $(& Get-PowerStubConfiguration "ModulePath") | Out-Null
+        }
+
+        It "Should export on new collection" {
+            $configFile = $config['ConfigFile']
+            $configFileBackup = $config['ConfigFile'] + ".bak"
+
+            if (Test-Path $configFile) {
+                Copy-Item $configFile $configFileBackup -Force
+                Remove-Item $configFile -Force
+            }
+
+            $testingPath = Join-Path $env:TEMP "PowerStubTesting"
+            $(& New-PowerStubCollection "PowerStubTesting" $testingPath) | Out-Null
+            Test-Path $configFile | Should be $true
+
+            if (Test-Path $configFileBackup) {
+                Copy-Item $configFileBackup $configFile -Force
+                Remove-Item $configFileBackup -Force
+            }
+        }
+
+    }
+
     Context "Basic Functions" {
         It "Should be a valid module export" {
             Get-Command -Module PowerStub -name 'Invoke-PowerStubCommand' | Should Not Be $null
@@ -25,11 +59,9 @@ Describe "Execute-PowerStubCommand" {
             $alias.Definition | Should Be 'Invoke-PowerStubCommand'
         }
 
-        It "Should not Fail when called with no params" {
-            $(& Invoke-PowerStubCommand)
+        It "Should not Fail with no params" {
+            $(& Invoke-PowerStubCommand) | Out-Null
         }
     }
-
-
 
 }

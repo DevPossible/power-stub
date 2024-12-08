@@ -9,7 +9,7 @@
 .PARAMETER
 
 .INPUTS
-None. You cannot pipe objects to Invoke-Authenticate.
+None. You cannot pipe objects to this function.
 
 .OUTPUTS
 
@@ -19,5 +19,13 @@ None. You cannot pipe objects to Invoke-Authenticate.
 
 
 function Get-PowerStubConfiguration {
+    param (
+        [string] $key
+    )
+    
+    if ($key) {
+        return $Script:PSTBSettings[$key]
+    }
+ 
     return $Script:PSTBSettings
 }
