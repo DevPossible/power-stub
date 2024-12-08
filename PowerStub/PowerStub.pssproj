@@ -36,8 +36,11 @@
     <Folder Include="tests\" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="private\functions\Export-PowerStubConfiguration.ps1" />
+    <Compile Include="private\functions\Import-PowerStubConfiguration.ps1" />
     <Compile Include="public\functions\Get-PowerStubConfiguration.ps1" />
     <Compile Include="public\functions\Invoke-PowerStubCommand.ps1" />
+    <Compile Include="public\functions\Remove-PowerStubCollection.ps1" />
     <Compile Include="public\functions\New-PowerStubCommand.ps1" />
     <Compile Include="public\functions\New-PowerStubCollection.ps1" />
     <Compile Include="PowerStub.psd1" />

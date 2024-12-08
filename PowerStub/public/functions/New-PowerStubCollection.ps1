@@ -12,7 +12,7 @@
 .PARAMETER
 
 .INPUTS
-None. You cannot pipe objects to Invoke-Authenticate.
+None. You cannot pipe objects to this function.
 
 .OUTPUTS
 
@@ -22,15 +22,31 @@ None. You cannot pipe objects to Invoke-Authenticate.
 
 function New-PowerStubCollection {
     param(
-        [string]$path
+        [string]$name,
+        [string]$path,
+        [switch]$force
     )
   
     #check to see if the path is already registered
-  
-  
+    if ($Script:PSTBSettings['Collections'].Keys -contains $name) {
+        if ($force) {
+            $Script:PSTBSettings['Collections'][$name] = $path
+        }
+        else {
+            throw "Collection $name already exists. Use -Force to overwrite."
+        }
+    }
+    else {
+        $Script:PSTBSettings['Collections'][$name] = $path
+    }
+    
+    #create the folder if necessary  
     if (-not (Test-Path $path)) {
         New-Item -ItemType Directory -Path $path
     }
+    
+    #update the configuration
+    Export-PowerStubConfiguration
 }
 
 

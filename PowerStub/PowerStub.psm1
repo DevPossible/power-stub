@@ -1,11 +1,12 @@
 $Script:PSTBSettings = @{
-    'ModuleName'  = 'PowerStub'
-    'ModulePath'  = $PSScriptRoot
-    'ConfigFile'  = Join-Path $PSScriptRoot 'PowerStub.json'
-    'InvokeAlias' = 'pstb'
+    'ModulePath'         = $PSScriptRoot
+    'ConfigFile'         = Join-Path $PSScriptRoot 'PowerStub.json'
+    'InternalConfigKeys' = @('InternalConfigKeys', 'ModulePath', 'ConfigFile')
+    'InvokeAlias'        = 'pstb'
+    'Collections'        = @{}
 }
 
-Write-Verbose "Initializing $($Script:PSTBSettings['ModuleName'])"
+Write-Verbose "Initializing PowerStub"
 
 #enable verbose messaging in the psm1 file
 if ($MyInvocation.line -match '-verbose') {
@@ -28,6 +29,9 @@ if ($IsCoreCLR) {
 Write-Verbose 'Dot-sourcing functions'
 ($publicFn + $privateFn) | ForEach-Object -Process { Write-Verbose $_.FullName; . $_.FullName }
 
+#load the configuration
+Import-PowerStubConfiguration
+
 #export public functions only
 
 # helper functions
@@ -43,4 +47,4 @@ Export-ModuleMember -Alias $Script:PSTBSettings['InvokeAlias']
 # management functions
 #Export-ModuleMember -Function 'New-PowerStubCollection'
 #Export-ModuleMember -Function 'New-PowerStubCommand'
-Write-Verbose "Module $($Script:PSTBSettings['ModuleName']) loaded."
+Write-Verbose "PowerStub module loaded."

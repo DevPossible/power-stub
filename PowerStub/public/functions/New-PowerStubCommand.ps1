@@ -9,7 +9,7 @@
 .PARAMETER
 
 .INPUTS
-None. You cannot pipe objects to Invoke-Authenticate.
+None. You cannot pipe objects to this function.
 
 .OUTPUTS
 
@@ -17,12 +17,12 @@ None. You cannot pipe objects to Invoke-Authenticate.
 
 #>
 
-function New-PowerStubCommand {
-    param(
+function New-PowerStubCommand {   
+    param (
         [string]$collectionPath,
         [string]$name
     )
-   
+    
     if (-not (Test-Path $rootFolder)) {
         New-Item -ItemType Directory -Path $rootFolder
     }
