@@ -23,26 +23,23 @@ function Invoke-PowerStubCommand {
         [parameter(Mandatory = $false, Position = 0)]
         [string] $stub,
         [parameter(Mandatory = $false, Position = 1)]
-        [string] $command
+        [string] $command,
+        [parameter(ValueFromRemainingArguments)]
+        $arguments
     )
 
-    if (!$command) {
-        $stubs = Get-PowerStubConfiguration Stubs
-        return $stubs.Keys
+    DynamicParam {
+        #result array
+        $RuntimeParamDic = Get-PowerStubCommandDynamicParams $stub $command
+
+        return $RuntimeParamDic
     }
-   
-    if (!$command) {
-        Find-PowerStubCommands $stub | Select-Object -ExpandProperty FullName
+
+    begin {
+        Write-Debug "Begin"
     }
-    
-    $line = $myinvocation.line
-    Write-Host "line: $line"
-    Write-Host "stub: $stub"
-    Write-Host "command: $command"    
-    
-    $srch = "$stub $command"
-    $i = $line.IndexOf($srch)
-    $arguments = $line.Substring($i + $srch.Length).Trim()
-        
-    Write-Host "arguments: $arguments"
+
+    process {
+        Write-Debug "Process"
+    }
 }
