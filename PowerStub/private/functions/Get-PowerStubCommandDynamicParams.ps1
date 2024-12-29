@@ -52,7 +52,7 @@ function Get-PowerStubCommandDynamicParams {
         $name = $param.Name
         $type = $param.ParameterType
         Write-Debug "Adding dynamic parameter '$name' with type '$type' and mandatory '$isMandatory'"
-        New-DynamicParam -Name $name -Type $type -Mandatory $isMandatory -DPDictionary $RuntimeParamDic 
+        New-DynamicParam -Name $name -Type $type -Mandatory:$isMandatory -DPDictionary $RuntimeParamDic
     }
 
     return $RuntimeParamDic

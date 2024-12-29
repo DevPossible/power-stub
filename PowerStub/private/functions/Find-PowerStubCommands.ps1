@@ -31,7 +31,7 @@ function Find-PowerStubCommands {
         return
     }
     
-    $commands = Get-ChildItem -Path $stubRoot -Recurse -Include *.ps1
+    $commands = Get-ChildItem -Path $stubRoot -Recurse -Include *.ps1, *.exe
     if ($beta -eq $false) {
         $commands = $commands | Where-Object { $_.FullName -notmatch "\.beta" }
     }
