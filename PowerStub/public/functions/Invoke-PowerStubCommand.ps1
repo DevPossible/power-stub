@@ -67,11 +67,15 @@ function Invoke-PowerStubCommand {
 
         $srch = "$stub $command"
         $i = $line.IndexOf($srch)
-        $arguments = $line.Substring($i + $srch.Length).Trim()
+        $cmdArgs = $line.Substring($i + $srch.Length).Trim()
 
-        $executable = $commandObj.Path
-        $expression = "& '$executable' $arguments"
-        Write-Debug "Executing Expression: $expression"
-        Invoke-Expression $expression
+        $cmd = $commandObj.Path
+
+        if ($cmdArgs) {
+            invoke-CheckedCommandWithParams $cmd $null $cmdArgs $true
+        }
+        else {
+            invoke-CheckedCommandWithParams $cmd $arguments $null $true
+        }
     }
 }

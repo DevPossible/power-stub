@@ -42,6 +42,10 @@ function Get-PowerStubCommand {
     }
 
     $commandFile = $commands | Select-Object -First 1
-    $commandObj = Get-Command -Name $($commandFile.FullName)
+    if (!$commandFile) {
+        Write-Warning "Command '$command' not found in the stub '$stub'."
+        return
+    }
+    $commandObj = Get-Command -Name $($commandFile.FullName) -ErrorAction SilentlyContinue
     return $commandObj
 }

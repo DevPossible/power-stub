@@ -36,6 +36,7 @@
     <Folder Include="tests\" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="private\functions\Invoke-CheckedCommand.ps1" />
     <Compile Include="private\functions\New-DynamicParam.ps1" />
     <Compile Include="private\functions\Get-PowerStubConfigurationKey.ps1" />
     <Compile Include="private\functions\Get-PowerStubConfigurationDefaults.ps1" />
