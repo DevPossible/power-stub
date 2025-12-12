@@ -642,9 +642,9 @@ Describe "Dynamic Parameters and Tab Completion" {
 
     Context "Tab Completion for Dynamic Parameters" {
         It "Should include dynamic parameters in tab completion" {
-            # Use TabExpansion2 to simulate real tab completion
+            # Use CompleteInput to simulate tab completion
             $input = 'Invoke-PowerStubCommand -Stub SampleStub -Command deploy -'
-            $completions = TabExpansion2 -inputScript $input -cursorColumn $input.Length
+            $completions = [System.Management.Automation.CommandCompletion]::CompleteInput($input, $input.Length, $null)
 
             $completionTexts = @($completions.CompletionMatches | Select-Object -ExpandProperty CompletionText)
 
@@ -654,12 +654,22 @@ Describe "Dynamic Parameters and Tab Completion" {
 
         It "Should include dynamic parameters when using alias" {
             $input = 'pstb SampleStub deploy -'
-            $completions = TabExpansion2 -inputScript $input -cursorColumn $input.Length
+            $completions = [System.Management.Automation.CommandCompletion]::CompleteInput($input, $input.Length, $null)
 
             $completionTexts = @($completions.CompletionMatches | Select-Object -ExpandProperty CompletionText)
 
             # Should include the dynamic parameter from the deploy command
             $completionTexts | Should -Contain '-Environment'
+        }
+
+        It "Should not break other commands completion" {
+            $input = 'Get-ChildItem -'
+            $completions = [System.Management.Automation.CommandCompletion]::CompleteInput($input, $input.Length, $null)
+
+            $completionTexts = @($completions.CompletionMatches | Select-Object -ExpandProperty CompletionText)
+
+            # Should still work normally for other commands
+            $completionTexts | Should -Contain '-Path'
         }
     }
 }

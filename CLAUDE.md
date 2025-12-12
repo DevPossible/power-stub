@@ -78,6 +78,17 @@ PowerStub/                        # Repository root
 - Parameter validation passthrough
 - Help text inheritance
 
+### Smart Tab Completion
+
+The module installs a custom `TabExpansion2` wrapper that provides intelligent parameter completion:
+
+- Filters out `-Stub` from completions when stub is already provided positionally
+- Filters out `-Command` from completions when command is already provided positionally
+- Shows dynamic parameters from the target command
+- Does not affect other PowerShell commands
+
+This allows `pstb DevOps deploy -<Tab>` to show only `-Environment` (the deploy script's parameter) instead of also showing `-Stub` and `-Command`.
+
 ### Configuration Management
 
 - Config stored in `$Script:PSTBSettings` hashtable
@@ -170,7 +181,7 @@ Import-PowerStubConfiguration -Reset
 
 ## Testing Approach
 
-Tests use Pester framework (54 tests). Key test areas:
+Tests use Pester framework (57 tests). Key test areas:
 
 - Configuration loading/saving
 - Stub registration/removal
@@ -180,6 +191,7 @@ Tests use Pester framework (54 tests). Key test areas:
 - Alpha/beta prefix precedence
 - Command discovery (direct files and subfolders)
 - Dynamic parameters and tab completion (using TabExpansion2)
+- Smart parameter filtering (filters already-bound positional params)
 
 ## Claude Commands
 
