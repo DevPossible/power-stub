@@ -84,6 +84,25 @@ PowerStub/                        # Repository root
 - Persisted to `PowerStub.json` (excludes internal keys)
 - Internal keys: `ModulePath`, `ConfigFile`, `InternalConfigKeys`
 
+### Command Discovery
+
+Commands are discovered in the `Commands` folder within each stub. Discovery rules:
+
+1. **Direct files**: Any `.ps1` or `.exe` file directly in `Commands/` is exposed
+2. **Subfolders**: Only files matching the folder name are exposed (prevents helper scripts from appearing)
+
+```text
+Commands/
+├── deploy.ps1              # EXPOSED as "deploy"
+├── backup.exe              # EXPOSED as "backup"
+└── complex-task/           # Subfolder
+    ├── complex-task.ps1    # EXPOSED as "complex-task" (matches folder name)
+    ├── helper.ps1          # NOT exposed (doesn't match folder name)
+    └── data.json           # NOT exposed (not .ps1/.exe)
+```
+
+This design allows complex commands to have supporting files without polluting the command namespace.
+
 ### Command Prefix System
 
 Commands use filename prefixes for lifecycle management:
@@ -96,9 +115,9 @@ Commands use filename prefixes for lifecycle management:
 
 When user types `pstb MyStub my-command`, the system searches in order:
 
-1. `alpha.my-command.ps1` (if alpha enabled)
-2. `beta.my-command.ps1` (if beta enabled)
-3. `my-command.ps1` (always)
+1. `Commands/alpha.my-command.ps1` or `Commands/my-command/alpha.my-command.ps1` (if alpha enabled)
+2. `Commands/beta.my-command.ps1` or `Commands/my-command/beta.my-command.ps1` (if beta enabled)
+3. `Commands/my-command.ps1` or `Commands/my-command/my-command.ps1` (always)
 
 The prefix is transparent to the user - they always type the unprefixed name.
 
@@ -140,7 +159,6 @@ Import-PowerStubConfiguration -Reset
 ## Known Issues / TODO
 
 - `Get-NamedParameters` function is referenced in `Invoke-CheckedCommand.ps1` but not defined - this breaks object parameter splatting
-- The module currently uses 40 positional parameters (o1-o40) as a workaround for argument passing
 
 ## Code Style Guidelines
 
@@ -152,13 +170,16 @@ Import-PowerStubConfiguration -Reset
 
 ## Testing Approach
 
-Tests use Pester framework. Key test areas:
+Tests use Pester framework (54 tests). Key test areas:
 
 - Configuration loading/saving
 - Stub registration/removal
 - Alias creation
 - Module exports
 - Folder structure creation
+- Alpha/beta prefix precedence
+- Command discovery (direct files and subfolders)
+- Dynamic parameters and tab completion (using TabExpansion2)
 
 ## Claude Commands
 

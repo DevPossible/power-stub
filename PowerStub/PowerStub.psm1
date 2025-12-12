@@ -55,16 +55,28 @@ Register-ArgumentCompleter -CommandName Invoke-PowerStubCommand -ParameterName S
 Write-Verbose "Setting up argument completer for Invoke-PowerStubCommand COMMAND parameter"
 $CommandCompleter = {
     param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameters)
-    
+
     $stub = $fakeBoundParameters['Stub']
+    if (!$stub) { return @() }
+
     $commands = @(Find-PowerStubCommands $stub)
-    if (!$commands) { Write-Warning "Stub $stub has no commands." }
-    $commandNames = @($commands | Select-Object -ExpandProperty BaseName)
-    
+    if (!$commands) { return @() }
+
+    # Get base names and strip alpha./beta. prefixes for user-friendly completion
+    $commandNames = @($commands | ForEach-Object {
+        $name = $_.BaseName
+        # Strip alpha. or beta. prefix if present
+        if ($name -match '^(alpha|beta)\.(.+)$') {
+            $Matches[2]
+        } else {
+            $name
+        }
+    } | Select-Object -Unique)
+
     if (!$stringMatch) { return $commandNames }
-        
-    $PartialMatches = $commandNames | Where-Object { $_ -like "$stringMatch*" } 
-    return $PartialMatches 
+
+    $PartialMatches = $commandNames | Where-Object { $_ -like "$stringMatch*" }
+    return $PartialMatches
 }
 
 Register-ArgumentCompleter -CommandName Invoke-PowerStubCommand -ParameterName Command -ScriptBlock $CommandCompleter

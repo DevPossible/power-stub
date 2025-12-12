@@ -3,8 +3,12 @@
   Finds all the commands for a stub while respecting the alpha and beta prefix settings.
 
 .DESCRIPTION
-  Discovers all .ps1 and .exe files in a stub directory. Filters out commands with
-  'alpha.' or 'beta.' prefixes unless those modes are enabled via configuration.
+  Discovers commands in a stub's Commands folder. Only exposes:
+  - Direct .ps1 and .exe files in the Commands folder
+  - For subfolders, only files matching the folder name (with optional alpha./beta. prefix)
+
+  This prevents helper scripts and supporting files from being exposed as commands.
+  Filters out 'alpha.' or 'beta.' prefixed commands unless those modes are enabled.
 
 .LINK
 
@@ -36,7 +40,29 @@ function Find-PowerStubCommands {
         return
     }
 
-    $commands = Get-ChildItem -Path $stubRoot -Recurse -Include *.ps1, *.exe
+    $commandsPath = Join-Path $stubRoot 'Commands'
+    $commands = @()
+
+    if (Test-Path $commandsPath) {
+        # 1. Get direct .ps1 and .exe files in Commands folder
+        $commands += Get-ChildItem -Path $commandsPath -File | Where-Object {
+            $_.Extension -in @('.ps1', '.exe')
+        }
+
+        # 2. For each subfolder, get files that match the folder name (with optional alpha./beta. prefix)
+        $subfolders = Get-ChildItem -Path $commandsPath -Directory
+        foreach ($folder in $subfolders) {
+            $folderName = $folder.Name
+            $matchingFiles = Get-ChildItem -Path $folder.FullName -File | Where-Object {
+                $_.Extension -in @('.ps1', '.exe') -and (
+                    $_.BaseName -eq $folderName -or
+                    $_.BaseName -eq "alpha.$folderName" -or
+                    $_.BaseName -eq "beta.$folderName"
+                )
+            }
+            $commands += $matchingFiles
+        }
+    }
 
     # Filter out alpha-prefixed commands when alpha mode is not enabled
     if ($alpha -ne $true) {

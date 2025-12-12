@@ -21,5 +21,5 @@ None.
 
 
 function Enable-PowerStubAlphaCommands {
-    Set-PowerStubConfigurationKey 'EnablePrefix:Alpha', $true
+    Set-PowerStubConfigurationKey 'EnablePrefix:Alpha' $true
 }

@@ -32,16 +32,16 @@ function New-PowerStub {
   
     #check to see if the path is already registered
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    if ($stubs.psobject.Properties.name -contains $name) {
+    if ($stubs.Keys -contains $name) {
         if ($force) {
-            $stubs.$name = $path
+            $stubs[$name] = $path
         }
         else {
             throw "Stub $name already exists. Use -Force to overwrite."
         }
     }
     else {
-        $stubs.$name = $path
+        $stubs[$name] = $path
     }
     
     #create the folder and standard child folders, if necessary

@@ -4,6 +4,10 @@
 
 .DESCRIPTION
   Locates and returns a PowerShell command object for the specified command in a stub.
+  Searches in the Commands folder for:
+  - Direct files matching the command name
+  - Subfolders matching the command name, containing a file with the same name
+
   When alpha or beta modes are enabled, searches for prefixed versions with precedence:
   alpha.* -> beta.* -> unprefixed (production)
 
@@ -41,25 +45,64 @@ function Get-PowerStubCommand {
         return
     }
 
+    $commandsPath = Join-Path $stubRoot 'Commands'
     $commandFile = $null
+
+    if (!(Test-Path $commandsPath)) {
+        Write-Warning "Commands folder not found for stub '$stub'."
+        return
+    }
+
+    # Helper: Find a file by name in a path (direct file only, not recursive)
+    $findDirectFile = {
+        param($searchPath, $baseName)
+        Get-ChildItem -Path $searchPath -File -ErrorAction SilentlyContinue | Where-Object {
+            $_.Extension -in @('.ps1', '.exe') -and $_.BaseName -eq $baseName
+        } | Select-Object -First 1
+    }
+
+    # Helper: Find a file in a subfolder where file basename matches the given name
+    $findInSubfolder = {
+        param($searchPath, $folderName, $baseName)
+        $subfolderPath = Join-Path $searchPath $folderName
+        if (Test-Path $subfolderPath -PathType Container) {
+            Get-ChildItem -Path $subfolderPath -File -ErrorAction SilentlyContinue | Where-Object {
+                $_.Extension -in @('.ps1', '.exe') -and $_.BaseName -eq $baseName
+            } | Select-Object -First 1
+        }
+    }
 
     # Precedence order: alpha -> beta -> production
     # 1. Try alpha-prefixed version first (if alpha enabled)
     if ($alpha -eq $true -and !$commandFile) {
-        $alphaIncludes = @("alpha.$($command).ps1", "alpha.$($command).exe")
-        $commandFile = Get-ChildItem -Path $stubRoot -Recurse -Include $alphaIncludes | Select-Object -First 1
+        $alphaName = "alpha.$command"
+        # Try direct file
+        $commandFile = & $findDirectFile $commandsPath $alphaName
+        # Try subfolder (folder named after unprefixed command)
+        if (!$commandFile) {
+            $commandFile = & $findInSubfolder $commandsPath $command $alphaName
+        }
     }
 
     # 2. Try beta-prefixed version (if beta enabled)
     if ($beta -eq $true -and !$commandFile) {
-        $betaIncludes = @("beta.$($command).ps1", "beta.$($command).exe")
-        $commandFile = Get-ChildItem -Path $stubRoot -Recurse -Include $betaIncludes | Select-Object -First 1
+        $betaName = "beta.$command"
+        # Try direct file
+        $commandFile = & $findDirectFile $commandsPath $betaName
+        # Try subfolder
+        if (!$commandFile) {
+            $commandFile = & $findInSubfolder $commandsPath $command $betaName
+        }
     }
 
     # 3. Try unprefixed (production) version
     if (!$commandFile) {
-        $prodIncludes = @("$($command).ps1", "$($command).exe")
-        $commandFile = Get-ChildItem -Path $stubRoot -Recurse -Include $prodIncludes | Select-Object -First 1
+        # Try direct file
+        $commandFile = & $findDirectFile $commandsPath $command
+        # Try subfolder
+        if (!$commandFile) {
+            $commandFile = & $findInSubfolder $commandsPath $command $command
+        }
     }
 
     if (!$commandFile) {

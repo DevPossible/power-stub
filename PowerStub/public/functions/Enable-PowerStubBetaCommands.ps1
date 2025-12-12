@@ -21,5 +21,5 @@ None.
 
 
 function Enable-PowerStubBetaCommands {
-    Set-PowerStubConfigurationKey 'EnablePrefix:Beta', $true
+    Set-PowerStubConfigurationKey 'EnablePrefix:Beta' $true
 }

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(find:*)",
-      "Bash(get-content:*)"
+      "Bash(get-content:*)",
+      "Bash(pwsh:*)"
     ]
   }
 }

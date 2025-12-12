@@ -64,7 +64,7 @@ C:\Tools\DevOps\
 
 ### 2. Add Commands
 
-Place your scripts or executables in the `Commands` folder (or any subfolder):
+Place your scripts or executables in the `Commands` folder:
 
 ```powershell
 # C:\Tools\DevOps\Commands\deploy-app.ps1
@@ -77,6 +77,23 @@ param(
 
 Write-Host "Deploying to $Environment with version $Version"
 ```
+
+#### Complex Commands with Supporting Files
+
+For commands that need helper scripts, data files, or executables, create a subfolder with the command name. Only the file matching the folder name is exposed as a command:
+
+```text
+Commands/
+├── simple-task.ps1              # Exposed as "simple-task"
+├── quick-deploy.exe             # Exposed as "quick-deploy"
+└── complex-deploy/              # Subfolder for complex command
+    ├── complex-deploy.ps1       # Exposed as "complex-deploy"
+    ├── deploy-helper.ps1        # NOT exposed (helper script)
+    ├── config.json              # NOT exposed (data file)
+    └── validator.exe            # NOT exposed (helper executable)
+```
+
+This prevents helper scripts from appearing in tab completion or being accidentally invoked as commands.
 
 ### 3. Use Your Commands
 
@@ -130,7 +147,7 @@ pstb DevOps deploy-app -Environment prod -Version 2.0.1
 
 ## Configuration File
 
-PowerStub stores its configuration in `PowerStub.json`:
+PowerStub stores its configuration in `PowerStub.json`, located in the module directory (alongside `PowerStub.psm1`):
 
 ```json
 {
@@ -162,6 +179,9 @@ YourStub/Commands/
 ├── alpha.new-feature.ps1   # Work in progress (Enable-PowerStubAlphaCommands)
 ├── beta.deploy-v2.ps1      # Beta testing (Enable-PowerStubBetaCommands)
 ├── deploy.ps1              # Production-ready (always visible)
+└── complex-task/           # Subfolder for complex command
+    ├── alpha.complex-task.ps1   # Alpha version (file matches folder name)
+    └── complex-task.ps1         # Production version
 ```
 
 **Prefix conventions:**
@@ -179,7 +199,7 @@ YourStub/Commands/
 **Resolution precedence:** `alpha.*` → `beta.*` → production (no prefix)
 
 When multiple versions exist (e.g., `alpha.deploy.ps1`, `beta.deploy.ps1`, `deploy.ps1`),
-the command resolves in precedence order based on enabled modes.
+the command resolves in precedence order based on enabled modes. This applies to both direct files and files in subfolders.
 
 ## Examples
 
@@ -241,10 +261,140 @@ PowerStub/                          # Repository root
 │   ├── PowerStub.psd1              # Module manifest
 │   └── PowerStub.json              # Runtime configuration
 ├── tests/                          # Pester test files
+│   ├── PowerStub.tests.ps1         # Main test suite
+│   └── sample_stub_root/           # Sample stub for integration tests
+├── dev-reload.ps1                  # Reload module for local testing
+├── dev-test.ps1                    # Run Pester test suite
 ├── README.md
-├── CLAUDE.md                       # Development guide
+├── CLAUDE.md                       # Development guide for Claude Code
 └── LICENSE.txt                     # Apache 2.0
 ```
+
+## Development
+
+This section covers local development and testing of the PowerStub module.
+
+### Prerequisites
+
+- PowerShell 5.1 or later
+- [Pester](https://pester.dev/) v5.x or later for running tests
+
+```powershell
+# Install Pester if not already installed
+Install-Module Pester -Force -SkipPublisherCheck
+```
+
+### Local Development Workflow
+
+#### 1. Clone and Set Up
+
+```powershell
+git clone https://github.com/DevPossible/PowerStub.git
+cd PowerStub
+```
+
+#### 2. Load the Module for Testing
+
+Use the `dev-reload.ps1` script to import the module from source:
+
+```powershell
+# Load/reload the module
+.\dev-reload.ps1
+
+# Load and reset configuration to defaults
+.\dev-reload.ps1 -Reset
+```
+
+This script:
+
+- Removes any existing PowerStub module from the session
+- Imports the module from local source (`PowerStub/PowerStub.psm1`)
+- Shows module info and current configuration
+
+#### 3. Make Changes
+
+Edit files in the `PowerStub/` folder:
+
+- **Public functions**: `PowerStub/Public/functions/` - Exported to users
+- **Private functions**: `PowerStub/Private/functions/` - Internal helpers
+
+After making changes, reload the module to test:
+
+```powershell
+.\dev-reload.ps1
+```
+
+#### 4. Run Tests
+
+Use the `dev-test.ps1` script to run the Pester test suite:
+
+```powershell
+# Run all tests with detailed output
+.\dev-test.ps1
+
+# Run specific tests by name filter
+.\dev-test.ps1 -Filter "*Alpha*"
+
+# Run with minimal output
+.\dev-test.ps1 -Output Normal
+
+# Skip module reload (if already loaded)
+.\dev-test.ps1 -SkipReload
+```
+
+#### 5. Interactive Testing
+
+Test your changes interactively using the sample stub:
+
+```powershell
+# Reload module
+.\dev-reload.ps1 -Reset
+
+# Register the sample stub from tests
+New-PowerStub -Name "Sample" -Path ".\tests\sample_stub_root" -Force
+
+# Test command discovery
+Get-PowerStubCommand -Stub "Sample" -Command "deploy"
+
+# Test command execution
+pstb Sample deploy -Environment "test"
+
+# Test alpha/beta features
+Enable-PowerStubAlphaCommands
+pstb Sample new-feature -Name "MyFeature"
+Disable-PowerStubAlphaCommands
+```
+
+### Test Structure
+
+Tests are located in `tests/PowerStub.tests.ps1` and cover:
+
+| Area | Description |
+|------|-------------|
+| Module Loading | Exports, aliases, private function isolation |
+| Configuration | Get/set/reset configuration values |
+| Stub Management | Register, remove, list stubs |
+| Command Discovery | Direct files, subfolders, helper isolation |
+| Alpha/Beta Prefixes | Enable/disable, precedence order |
+| Command Execution | Parameter passing, output capture |
+
+The `tests/sample_stub_root/` folder contains a pre-configured stub with various command types for integration testing.
+
+### Adding New Features
+
+1. **New public function**: Create in `PowerStub/Public/functions/Verb-PowerStub*.ps1`
+2. **New private function**: Create in `PowerStub/Private/functions/*.ps1`
+3. **Add tests**: Update `tests/PowerStub.tests.ps1`
+4. **Update documentation**: Update README.md and CLAUDE.md
+
+Functions are automatically loaded by the module - no manifest changes needed.
+
+### Code Style
+
+- Use approved PowerShell verbs (`Get-`, `Set-`, `New-`, etc.)
+- Prefix public functions with `PowerStub`
+- Include `[CmdletBinding()]` on all functions
+- Use `$Script:` scope for module-level variables
 
 ## Requirements
 
@@ -262,3 +412,5 @@ DevPossible LLC
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
+
+See the [Development](#development) section above for local setup, testing, and code style guidelines.

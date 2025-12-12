@@ -27,20 +27,21 @@ function Get-PowerStubCommandDynamicParams {
     )
 
     #result array
-    $RuntimeParamDic = New-Object  System.Management.Automation.RuntimeDefinedParameterDictionary
+    $RuntimeParamDic = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
 
+    # Silently return empty dictionary if stub or command not provided
+    # (this happens during tab completion when user hasn't finished typing)
     if (!$stub -or !$command) {
-        Write-Warning "Stub and Command are required."
         return $RuntimeParamDic
     }
     Write-Debug "Stub: $stub"
     Write-Debug "Command: $command"
 
-    #load parameters from the command
-    $commandObj = Get-PowerStubCommand $stub $command
+    # Load parameters from the command (suppress warnings during tab completion)
+    $commandObj = Get-PowerStubCommand $stub $command -WarningAction SilentlyContinue
     Write-Debug "Dyn Param Command: $($commandObj.Name)"
     if (!$commandObj) {
-        Write-Warning "Command '$command' not found in the configuration."
+        # Silently return - command may not exist yet during tab completion
         return $RuntimeParamDic
     }
 

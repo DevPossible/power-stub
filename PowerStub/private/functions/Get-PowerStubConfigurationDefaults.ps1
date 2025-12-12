@@ -26,6 +26,8 @@ function Get-PowerStubConfigurationDefaults {
         'InternalConfigKeys' = @('InternalConfigKeys', 'ModulePath', 'ConfigFile')
         'InvokeAlias'        = 'pstb'
         'Stubs'              = @{}
+        'EnablePrefix:Alpha' = $false
+        'EnablePrefix:Beta'  = $false
     }
     
     return $defaults
