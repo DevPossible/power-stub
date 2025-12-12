@@ -1,23 +1,25 @@
 <#
 .SYNOPSIS
-  Disables the commands in the .beta folders for PowerStubs. This is disables 'beta-tester mode'.
+  Disables beta.* prefixed commands for PowerStubs. This disables 'beta-tester mode'.
 
 .DESCRIPTION
+  When disabled, commands with the 'beta.' prefix (e.g., beta.my-command.ps1) are
+  hidden from tab completion and cannot be executed.
 
 .LINK
 
-.PARAMETER
-
 .INPUTS
-None. You cannot pipe objects to Invoke-Authenticate.
+None. You cannot pipe objects to this function.
 
 .OUTPUTS
+None.
 
 .EXAMPLES
+  Disable-PowerStubBetaCommands
 
 #>
 
 
 function Disable-PowerStubBetaCommands {
-    Set-PowerStubConfigurationKey 'EnableFolder:Beta', $false
+    Set-PowerStubConfigurationKey 'EnablePrefix:Beta', $false
 }

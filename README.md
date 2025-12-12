@@ -29,7 +29,7 @@ pstb DevOps deploy-app -Environment prod
 - **Tab Completion**: Full IntelliSense for stub names, commands, and parameters
 - **Dynamic Parameters**: Automatically inherits parameters from target commands
 - **Multi-format Support**: Works with `.ps1` scripts and `.exe` executables
-- **Lifecycle Folders**: Built-in support for `.draft` and `.beta` command stages
+- **Lifecycle Prefixes**: Built-in support for `alpha.*` and `beta.*` command stages
 - **Zero PATH Pollution**: Single alias (`pstb`) provides access to all your tools
 
 ## Installation
@@ -58,9 +58,7 @@ This creates the following folder structure:
 
 ```text
 C:\Tools\DevOps\
-├── Commands\       # Main production commands
-├── .draft\         # Work-in-progress commands (hidden by default)
-├── .beta\          # Beta commands (hidden by default)
+├── Commands\       # Your commands go here
 └── .tests\         # Test files
 ```
 
@@ -125,9 +123,9 @@ pstb DevOps deploy-app -Environment prod -Version 2.0.1
 
 | Command | Description |
 |---------|-------------|
-| `Enable-PowerStubDraftCommands` | Show commands in `.draft` folders |
-| `Disable-PowerStubDraftCommands` | Hide draft commands |
-| `Enable-PowerStubBetaCommands` | Show commands in `.beta` folders |
+| `Enable-PowerStubAlphaCommands` | Show `alpha.*` prefixed commands |
+| `Disable-PowerStubAlphaCommands` | Hide alpha commands |
+| `Enable-PowerStubBetaCommands` | Show `beta.*` prefixed commands |
 | `Disable-PowerStubBetaCommands` | Hide beta commands |
 
 ## Configuration File
@@ -141,8 +139,8 @@ PowerStub stores its configuration in `PowerStub.json`:
     "Database": "C:\\Tools\\Database\\"
   },
   "InvokeAlias": "pstb",
-  "EnableFolder:Beta": false,
-  "EnableFolder:Drafts": false
+  "EnablePrefix:Alpha": false,
+  "EnablePrefix:Beta": false
 }
 ```
 
@@ -152,30 +150,36 @@ PowerStub stores its configuration in `PowerStub.json`:
 |-----|------|---------|-------------|
 | `Stubs` | Object | `{}` | Map of stub names to root paths |
 | `InvokeAlias` | String | `pstb` | Alias for `Invoke-PowerStubCommand` |
-| `EnableFolder:Beta` | Boolean | `false` | Include `.beta` folder commands |
-| `EnableFolder:Drafts` | Boolean | `false` | Include `.draft` folder commands |
+| `EnablePrefix:Alpha` | Boolean | `false` | Include `alpha.*` prefixed commands |
+| `EnablePrefix:Beta` | Boolean | `false` | Include `beta.*` prefixed commands |
 
 ## Command Lifecycle
 
-PowerStub supports organizing commands by development stage:
+PowerStub supports organizing commands by development stage using filename prefixes:
 
 ```text
-YourStub/
-├── Commands/           # Production-ready commands (always visible)
-│   └── deploy.ps1
-├── .beta/              # Beta testing (Enable-PowerStubBetaCommands)
-│   └── deploy-v2.ps1
-├── .draft/             # Work in progress (Enable-PowerStubDraftCommands)
-│   └── new-feature.ps1
-└── .tests/             # Test files (not exposed as commands)
-    └── deploy.tests.ps1
+YourStub/Commands/
+├── alpha.new-feature.ps1   # Work in progress (Enable-PowerStubAlphaCommands)
+├── beta.deploy-v2.ps1      # Beta testing (Enable-PowerStubBetaCommands)
+├── deploy.ps1              # Production-ready (always visible)
 ```
+
+**Prefix conventions:**
+
+- `alpha.*` - Work-in-progress commands (developer mode)
+- `beta.*` - Beta/experimental commands (tester mode)
+- No prefix - Production-ready commands
 
 **Workflow:**
 
-1. Start new commands in `.draft/`
-2. Move to `.beta/` when ready for testing
-3. Graduate to `Commands/` for production use
+1. Create new commands with `alpha.` prefix (e.g., `alpha.my-feature.ps1`)
+2. Rename to `beta.` prefix when ready for testing
+3. Remove prefix for production use
+
+**Resolution precedence:** `alpha.*` → `beta.*` → production (no prefix)
+
+When multiple versions exist (e.g., `alpha.deploy.ps1`, `beta.deploy.ps1`, `deploy.ps1`),
+the command resolves in precedence order based on enabled modes.
 
 ## Examples
 
@@ -196,17 +200,20 @@ Get-PowerStubs
 # Azure                          C:\Tools\Azure\
 ```
 
-### Work with Draft Commands
+### Work with Alpha Commands
 
 ```powershell
-# Enable draft visibility
-Enable-PowerStubDraftCommands
+# Enable alpha visibility
+Enable-PowerStubAlphaCommands
 
-# Now commands in .draft folders appear in completion
-pstb DevOps <TAB>  # Shows both production and draft commands
+# Now alpha.* prefixed commands appear in completion
+pstb DevOps <TAB>  # Shows both production and alpha commands
+
+# Run an alpha command (no need to type the prefix)
+pstb DevOps my-feature  # Executes alpha.my-feature.ps1
 
 # Disable when done developing
-Disable-PowerStubDraftCommands
+Disable-PowerStubAlphaCommands
 ```
 
 ### Use with Executables

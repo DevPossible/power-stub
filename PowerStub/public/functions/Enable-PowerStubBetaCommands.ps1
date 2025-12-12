@@ -1,23 +1,25 @@
 <#
 .SYNOPSIS
-  Enables the commands in the .beta folders for PowerStubs. This is essentially 'beta-tester mode'.
+  Enables beta.* prefixed commands for PowerStubs. This is essentially 'beta-tester mode'.
 
 .DESCRIPTION
+  When enabled, commands with the 'beta.' prefix (e.g., beta.my-command.ps1) become
+  visible in tab completion and can be executed.
 
 .LINK
 
-.PARAMETER
-
 .INPUTS
-None. You cannot pipe objects to Invoke-Authenticate.
+None. You cannot pipe objects to this function.
 
 .OUTPUTS
+None.
 
 .EXAMPLES
+  Enable-PowerStubBetaCommands
 
 #>
 
 
 function Enable-PowerStubBetaCommands {
-    Set-PowerStubConfigurationKey 'EnableFolder:Beta', $true
+    Set-PowerStubConfigurationKey 'EnablePrefix:Beta', $true
 }

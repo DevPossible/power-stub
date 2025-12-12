@@ -39,16 +39,16 @@ PowerStub/                        # Repository root
 | `Get-PowerStubCommand.ps1` | Introspection | Gets command object details |
 | `Get-PowerStubConfiguration.ps1` | Config read | Returns current configuration |
 | `Import-PowerStubConfiguration.ps1` | Config load | Loads/resets config from JSON |
-| `Enable-PowerStubBetaCommands.ps1` | Toggle | Shows .beta folder commands |
-| `Disable-PowerStubBetaCommands.ps1` | Toggle | Hides .beta folder commands |
-| `Enable-PowerStubDraftCommands.ps1` | Toggle | Shows .draft folder commands |
-| `Disable-PowerStubDraftCommands.ps1` | Toggle | Hides .draft folder commands |
+| `Enable-PowerStubBetaCommands.ps1` | Toggle | Shows beta.* prefixed commands |
+| `Disable-PowerStubBetaCommands.ps1` | Toggle | Hides beta.* prefixed commands |
+| `Enable-PowerStubAlphaCommands.ps1` | Toggle | Shows alpha.* prefixed commands |
+| `Disable-PowerStubAlphaCommands.ps1` | Toggle | Hides alpha.* prefixed commands |
 
 ### Private Functions (Internal)
 
 | File | Function | Purpose |
 |------|----------|---------|
-| `Find-PowerStubCommands.ps1` | Discovery | Recursively finds .ps1/.exe files in stub |
+| `Find-PowerStubCommands.ps1` | Discovery | Finds .ps1/.exe files, filters by alpha./beta. prefix |
 | `Get-PowerStubCommandDynamicParams.ps1` | DynamicParam | Extracts parameters from target command |
 | `Invoke-CheckedCommand.ps1` | Execution | Core command runner with error handling |
 | `New-DynamicParam.ps1` | Utility | Creates RuntimeDefinedParameter objects |
@@ -83,6 +83,24 @@ PowerStub/                        # Repository root
 - Config stored in `$Script:PSTBSettings` hashtable
 - Persisted to `PowerStub.json` (excludes internal keys)
 - Internal keys: `ModulePath`, `ConfigFile`, `InternalConfigKeys`
+
+### Command Prefix System
+
+Commands use filename prefixes for lifecycle management:
+
+- `alpha.my-command.ps1` - Work-in-progress (requires `EnablePrefix:Alpha`)
+- `beta.my-command.ps1` - Beta testing (requires `EnablePrefix:Beta`)
+- `my-command.ps1` - Production (always visible)
+
+**Resolution precedence:** `alpha.*` → `beta.*` → production (no prefix)
+
+When user types `pstb MyStub my-command`, the system searches in order:
+
+1. `alpha.my-command.ps1` (if alpha enabled)
+2. `beta.my-command.ps1` (if beta enabled)
+3. `my-command.ps1` (always)
+
+The prefix is transparent to the user - they always type the unprefixed name.
 
 ## Build & Test Commands
 

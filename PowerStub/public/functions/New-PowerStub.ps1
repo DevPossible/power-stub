@@ -44,8 +44,9 @@ function New-PowerStub {
         $stubs.$name = $path
     }
     
-    #create the folder and standard child folders, if necessary  
-    $paths = @($path, (Join-Path $path '.draft'), (Join-Path $path '.beta'), (Join-Path $path '.tests'), (Join-Path $path 'Commands'))
+    #create the folder and standard child folders, if necessary
+    # Note: draft and beta commands use filename prefixes (draft.*, beta.*) instead of separate folders
+    $paths = @($path, (Join-Path $path '.tests'), (Join-Path $path 'Commands'))
     foreach ($pathItem in $paths) {
         if (-not (Test-Path $pathItem)) {
             New-Item -ItemType Directory -Path $pathItem -Force | Out-Null
