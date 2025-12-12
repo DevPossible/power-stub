@@ -12,14 +12,12 @@ function Invoke-CheckedCommandWithParams {
 
         #$hasObjects = ($psParams | Where-Object {!($_ -is [String])})
         $hasObjects = $false
-        if (!$cmdArguments) {
-            $stringTypes = "System.String", "String"
-            foreach ($param in $psParams) {
-                $type = $param.GetType().FullName
-                if (!($stringTypes -contains $type)) {
-                    $hasObjects = $true
-                    break
-                }
+        $stringTypes = "System.String", "String"
+        foreach ($param in $psParams) {
+            $type = $param.GetType().FullName
+            if (!($stringTypes -contains $type)) {
+                $hasObjects = $true
+                break
             }
         }
 
@@ -32,13 +30,16 @@ function Invoke-CheckedCommandWithParams {
         }
         else {
             #all the parameters are strings, so lets avoid splatting problems by using a more compatible method
+            $exeParsing = ""
+            if ($command -like '*.exe') { $exeParsing = "--% " } #trailing space is important
+
             if ($cmdArguments) {
                 #just use the command line as provided
-                $exp = "$command --% $cmdArguments"
+                $exp = "& $command $($exeParsing)$cmdArguments" #do not add a space between the exeParsing variable and the arguments variable
             }
             else {
                 #use the parameters as provided by converting the array to a string
-                $exp = "$command "
+                $exp = "& $command --% "
                 $exp += $psParams -join " "
             }
 

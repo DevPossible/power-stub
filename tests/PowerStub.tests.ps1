@@ -8,7 +8,7 @@ $module = Get-Module -Name 'PowerStub'
 if ($module) {
     Remove-Module -ModuleInfo $module -Force
 }
-$modulePath = Join-Path $PSScriptRoot '..\PowerStub.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\PowerStub\PowerStub.psm1'
 Import-Module $modulePath -Force -Verbose
 
 $config = Get-PowerStubConfiguration
