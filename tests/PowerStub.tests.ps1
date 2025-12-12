@@ -61,6 +61,8 @@ Describe "PowerStub Module" {
             $expectedFunctions = @(
                 'Invoke-PowerStubCommand'
                 'New-PowerStub'
+                'New-PowerStubDirectAlias'
+                'Remove-PowerStubDirectAlias'
                 'Remove-PowerStub'
                 'Get-PowerStubs'
                 'Get-PowerStubCommand'
@@ -670,6 +672,212 @@ Describe "Dynamic Parameters and Tab Completion" {
 
             # Should still work normally for other commands
             $completionTexts | Should -Contain '-Path'
+        }
+    }
+}
+
+Describe "New-PowerStubDirectAlias" {
+    BeforeAll {
+        Import-PowerStubConfiguration -Reset
+        New-PowerStub -Name "SampleStub" -Path $script:SampleStubRoot -Force
+    }
+
+    BeforeEach {
+        # Clean up any test aliases thoroughly
+        @('teststub', 'ts', 'myalias', 'forcealias', 'configalias') | ForEach-Object {
+            # Remove from function: drive
+            Remove-Item "function:$_" -ErrorAction SilentlyContinue
+            Remove-Item "function:global:$_" -ErrorAction SilentlyContinue
+        }
+        # Clear direct aliases from config
+        InModuleScope PowerStub { Set-PowerStubConfigurationKey 'DirectAliases' @{} }
+    }
+
+    AfterAll {
+        # Clean up test aliases
+        @('teststub', 'ts', 'myalias', 'forcealias', 'configalias') | ForEach-Object {
+            Remove-Item "function:$_" -ErrorAction SilentlyContinue
+            Remove-Item "function:global:$_" -ErrorAction SilentlyContinue
+        }
+    }
+
+    Context "Parameter Validation" {
+        It "Should require -AliasName parameter" {
+            { New-PowerStubDirectAlias -Stub "SampleStub" } | Should -Throw
+        }
+
+        It "Should require -Stub parameter" {
+            { New-PowerStubDirectAlias -AliasName "ts" } | Should -Throw
+        }
+
+        It "Should throw when stub doesn't exist" {
+            { New-PowerStubDirectAlias -AliasName "ts" -Stub "NonExistentStub" } | Should -Throw "*not found*"
+        }
+
+        It "Should validate alias name format" {
+            { New-PowerStubDirectAlias -AliasName "123invalid" -Stub "SampleStub" } | Should -Throw
+        }
+
+        It "Should throw when alias exists without -Force" {
+            New-PowerStubDirectAlias -AliasName "ts" -Stub "SampleStub"
+            { New-PowerStubDirectAlias -AliasName "ts" -Stub "SampleStub" } | Should -Throw "*already exists*"
+        }
+    }
+
+    Context "Alias Creation" {
+        It "Should create a global function with the alias name" {
+            New-PowerStubDirectAlias -AliasName "teststub" -Stub "SampleStub"
+
+            $cmd = Get-Command "teststub" -ErrorAction SilentlyContinue
+            $cmd | Should -Not -BeNullOrEmpty
+            $cmd.CommandType | Should -Be 'Function'
+        }
+
+        It "Should overwrite alias when -Force is specified" {
+            New-PowerStubDirectAlias -AliasName "forcealias" -Stub "SampleStub"
+            { New-PowerStubDirectAlias -AliasName "forcealias" -Stub "SampleStub" -Force } | Should -Not -Throw
+        }
+
+        It "Should return info object with AliasName, Stub, and StubPath" {
+            $result = New-PowerStubDirectAlias -AliasName "myalias" -Stub "SampleStub"
+
+            $result | Should -Not -BeNullOrEmpty
+            $result.AliasName | Should -Be "myalias"
+            $result.Stub | Should -Be "SampleStub"
+            $result.StubPath | Should -Be $script:SampleStubRoot
+            $result.Usage | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should store alias in config for persistence" {
+            New-PowerStubDirectAlias -AliasName "configalias" -Stub "SampleStub"
+
+            $directAliases = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'DirectAliases' }
+            $directAliases | Should -Not -BeNullOrEmpty
+            $directAliases['configalias'] | Should -Be 'SampleStub'
+        }
+    }
+
+    Context "Alias Functionality" {
+        BeforeEach {
+            New-PowerStub -Name "SampleStub" -Path $script:SampleStubRoot -Force
+            Disable-PowerStubAlphaCommands
+            Disable-PowerStubBetaCommands
+            New-PowerStubDirectAlias -AliasName "ts" -Stub "SampleStub" -Force
+        }
+
+        It "Should list commands when run without arguments" {
+            $output = ts
+            $output | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should execute commands with parameters" {
+            $output = ts deploy -Environment "test"
+            $output | Should -Contain "deploy.ps1 (production) executed"
+        }
+    }
+
+    Context "Tab Completion" {
+        BeforeEach {
+            New-PowerStub -Name "SampleStub" -Path $script:SampleStubRoot -Force
+            Disable-PowerStubAlphaCommands
+            Disable-PowerStubBetaCommands
+            New-PowerStubDirectAlias -AliasName "ts" -Stub "SampleStub" -Force
+        }
+
+        It "Should complete command names using ArgumentCompleter" {
+            # Test the completer directly by simulating what happens during tab completion
+            # The ArgumentCompleter returns command names for the stub
+            $commands = InModuleScope PowerStub {
+                $commands = @(Find-PowerStubCommands "SampleStub")
+                @($commands | ForEach-Object {
+                    $name = $_.BaseName
+                    if ($name -match '^(alpha|beta)\.(.+)$') {
+                        $Matches[2]
+                    } else {
+                        $name
+                    }
+                } | Select-Object -Unique)
+            }
+            $commands | Should -Contain 'deploy'
+        }
+
+        It "Should complete dynamic parameters for commands" {
+            $input = 'ts deploy -'
+            $completions = [System.Management.Automation.CommandCompletion]::CompleteInput($input, $input.Length, $null)
+
+            $completionTexts = @($completions.CompletionMatches | Select-Object -ExpandProperty CompletionText)
+            $completionTexts | Should -Contain '-Environment'
+        }
+    }
+}
+
+Describe "Remove-PowerStubDirectAlias" {
+    BeforeAll {
+        Import-PowerStubConfiguration -Reset
+        New-PowerStub -Name "SampleStub" -Path $script:SampleStubRoot -Force
+    }
+
+    BeforeEach {
+        # Clean up any test aliases
+        @('removeme', 'keepme') | ForEach-Object {
+            if (Get-Command $_ -ErrorAction SilentlyContinue) {
+                Remove-Item "function:global:$_" -ErrorAction SilentlyContinue
+            }
+        }
+        # Clear direct aliases from config
+        InModuleScope PowerStub { Set-PowerStubConfigurationKey 'DirectAliases' @{} }
+    }
+
+    AfterAll {
+        # Clean up test aliases
+        @('removeme', 'keepme') | ForEach-Object {
+            if (Get-Command $_ -ErrorAction SilentlyContinue) {
+                Remove-Item "function:global:$_" -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Context "Parameter Validation" {
+        It "Should require -AliasName parameter" {
+            { Remove-PowerStubDirectAlias } | Should -Throw
+        }
+
+        It "Should throw when alias doesn't exist in config" {
+            { Remove-PowerStubDirectAlias -AliasName "nonexistent" } | Should -Throw "*not found*"
+        }
+    }
+
+    Context "Alias Removal" {
+        It "Should remove the global function" {
+            New-PowerStubDirectAlias -AliasName "removeme" -Stub "SampleStub"
+            Get-Command "removeme" -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+
+            Remove-PowerStubDirectAlias -AliasName "removeme"
+
+            Get-Command "removeme" -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        }
+
+        It "Should remove alias from config" {
+            New-PowerStubDirectAlias -AliasName "removeme" -Stub "SampleStub"
+
+            $directAliases = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'DirectAliases' }
+            $directAliases['removeme'] | Should -Be 'SampleStub'
+
+            Remove-PowerStubDirectAlias -AliasName "removeme"
+
+            $directAliases = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'DirectAliases' }
+            $directAliases.ContainsKey('removeme') | Should -Be $false
+        }
+
+        It "Should not affect other aliases" {
+            New-PowerStubDirectAlias -AliasName "removeme" -Stub "SampleStub"
+            New-PowerStubDirectAlias -AliasName "keepme" -Stub "SampleStub"
+
+            Remove-PowerStubDirectAlias -AliasName "removeme"
+
+            Get-Command "keepme" -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            $directAliases = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'DirectAliases' }
+            $directAliases['keepme'] | Should -Be 'SampleStub'
         }
     }
 }

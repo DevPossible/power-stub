@@ -119,4 +119,25 @@ if ($psrlModule) {
 # completions will still include -stub and -command even though they're already bound.
 # This is a minor UX issue that's preferable to potentially breaking all tab completion.
 
+# Re-register any saved direct aliases
+Write-Verbose "Registering saved direct aliases"
+$directAliases = Get-PowerStubConfigurationKey 'DirectAliases'
+if ($directAliases) {
+    foreach ($aliasName in $directAliases.Keys) {
+        $stubName = $directAliases[$aliasName]
+        # Only re-register if the stub still exists
+        $stubs = Get-PowerStubConfigurationKey 'Stubs'
+        if ($stubs.Keys -contains $stubName) {
+            try {
+                New-PowerStubDirectAlias -AliasName $aliasName -Stub $stubName -Force -ErrorAction Stop | Out-Null
+                Write-Verbose "Registered direct alias '$aliasName' for stub '$stubName'"
+            } catch {
+                Write-Warning "Could not register direct alias '$aliasName': $_"
+            }
+        } else {
+            Write-Verbose "Skipping alias '$aliasName' - stub '$stubName' no longer exists"
+        }
+    }
+}
+
 Write-Verbose "PowerStub module loaded."
