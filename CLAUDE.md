@@ -13,13 +13,13 @@ PowerStub is a PowerShell module that creates command proxies ("stubs") for orga
 ```text
 PowerStub/                        # Repository root
 ├── PowerStub/                    # Module directory (publishable to PSGallery)
-│   ├── Public/functions/         # 11 exported user-facing functions
-│   ├── Private/functions/        # 10 internal helper functions
+│   ├── Public/functions/         # 16 exported user-facing functions
+│   ├── Private/functions/        # 11 internal helper functions
 │   ├── Templates/                # Command templates
 │   ├── PowerStub.psm1            # Module loader (dot-sources all functions)
 │   ├── PowerStub.psd1            # Module manifest (version 2.0)
 │   └── PowerStub.json            # Runtime configuration
-├── tests/                        # Pester test files (at repo root)
+├── tests/                        # Pester test files (at repo root, 86 tests)
 ├── .claude/commands/             # Claude Code slash commands
 ├── README.md                     # User documentation
 ├── CLAUDE.md                     # This file
@@ -37,6 +37,10 @@ PowerStub/                        # Repository root
 | `Remove-PowerStub.ps1` | Cleanup | Unregisters a stub from config |
 | `Get-PowerStubs.ps1` | Discovery | Lists all registered stubs |
 | `Get-PowerStubCommand.ps1` | Introspection | Gets command object details |
+| `Get-PowerStubCommandHelp.ps1` | Help | Displays help for a stub command |
+| `Search-PowerStubCommands.ps1` | Search | Searches commands across all stubs |
+| `New-PowerStubDirectAlias.ps1` | Alias creation | Creates shortcut alias for a stub |
+| `Remove-PowerStubDirectAlias.ps1` | Alias removal | Removes a direct alias |
 | `Get-PowerStubConfiguration.ps1` | Config read | Returns current configuration |
 | `Import-PowerStubConfiguration.ps1` | Config load | Loads/resets config from JSON |
 | `Enable-PowerStubBetaCommands.ps1` | Toggle | Shows beta.* prefixed commands |
@@ -53,6 +57,7 @@ PowerStub/                        # Repository root
 | `Invoke-CheckedCommand.ps1` | Execution | Core command runner with error handling |
 | `New-DynamicParam.ps1` | Utility | Creates RuntimeDefinedParameter objects |
 | `ConvertTo-Hashtable.ps1` | Utility | Converts PSObjects to hashtables |
+| `Show-PowerStubOverview.ps1` | Display | Shows overview when pstb runs without args |
 | `Get-PowerStubConfigurationDefaults.ps1` | Config | Returns default config structure |
 | `Get-PowerStubConfigurationKey.ps1` | Config | Gets single config value |
 | `Set-PowerStubConfigurationKey.ps1` | Config | Sets single config key |
@@ -69,6 +74,29 @@ PowerStub/                        # Repository root
 4. Exports only public functions
 5. Creates `pstb` alias for `Invoke-PowerStubCommand`
 6. Registers ArgumentCompleters for `-Stub` and `-Command` parameters
+7. Re-registers saved direct aliases from configuration
+
+### Virtual Verbs
+
+Virtual verbs are built-in commands that don't map to script files:
+
+- `pstb search <query>` - Searches all stubs for commands matching query
+- `pstb help <stub> <command>` - Displays PowerShell help for a command
+
+Virtual verbs are intercepted in `Invoke-PowerStubCommand` before stub resolution.
+
+### Direct Aliases
+
+Direct aliases provide shortcut access to frequently used stubs:
+
+```powershell
+New-PowerStubDirectAlias -AliasName "do" -Stub "DevOps"
+do deploy  # Same as: pstb DevOps deploy
+```
+
+- Aliases are stored in `DirectAliases` config key
+- Re-registered automatically on module load
+- Support full tab completion for commands and parameters
 
 ### Dynamic Parameters
 
@@ -181,7 +209,7 @@ Import-PowerStubConfiguration -Reset
 
 ## Testing Approach
 
-Tests use Pester framework (57 tests). Key test areas:
+Tests use Pester framework (86 tests). Key test areas:
 
 - Configuration loading/saving
 - Stub registration/removal
@@ -192,6 +220,8 @@ Tests use Pester framework (57 tests). Key test areas:
 - Command discovery (direct files and subfolders)
 - Dynamic parameters and tab completion (using TabExpansion2)
 - Smart parameter filtering (filters already-bound positional params)
+- Direct aliases (create, remove, persistence, tab completion)
+- Virtual verbs (search, help commands)
 
 ## Claude Commands
 

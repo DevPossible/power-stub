@@ -20,8 +20,8 @@ None. You cannot pipe objects to Invoke-Authenticate.
 function Invoke-PowerStubCommand {
     [cmdletbinding()]
     param(
-        [parameter(Mandatory = $true, Position = 0)] [string] $stub,
-        [parameter(Mandatory = $true, Position = 1)] [string] $command,
+        [parameter(Position = 0)] [string] $stub,
+        [parameter(Position = 1)] [string] $command,
         # ValueFromRemainingArguments captures any positional arguments after stub and command
         [parameter(DontShow = $true, ValueFromRemainingArguments = $true)] [object[]] $RemainingArgs
     )
@@ -53,12 +53,39 @@ function Invoke-PowerStubCommand {
         Write-Debug "Invoke-PowerStubCommand Process"
 
         if (!$stub) {
-            $stubs = Get-PowerStubConfiguration Stubs
-            return $stubs.Keys
+            Show-PowerStubOverview
+            return
+        }
+
+        # Virtual verb handling - these are reserved commands that don't map to script files
+        $virtualVerbs = @('search', 'help')
+        if ($virtualVerbs -contains $stub) {
+            switch ($stub) {
+                'search' {
+                    if ($command) {
+                        return Search-PowerStubCommands $command
+                    }
+                    else {
+                        throw "Usage: pstb search <query>"
+                    }
+                }
+                'help' {
+                    if ($command -and $RemainingArgs -and $RemainingArgs.Count -gt 0) {
+                        # pstb help <stub> <command>
+                        return Get-PowerStubCommandHelp -Stub $command -Command $RemainingArgs[0]
+                    }
+                    elseif ($command) {
+                        throw "Usage: pstb help <stub> <command>"
+                    }
+                    else {
+                        throw "Usage: pstb help <stub> <command>"
+                    }
+                }
+            }
         }
 
         if (!$command) {
-            Find-PowerStubCommands $stub
+            return Find-PowerStubCommands $stub
         }
 
         $commandObj = Get-PowerStubCommand $stub $command

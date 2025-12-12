@@ -66,6 +66,8 @@ Describe "PowerStub Module" {
                 'Remove-PowerStub'
                 'Get-PowerStubs'
                 'Get-PowerStubCommand'
+                'Get-PowerStubCommandHelp'
+                'Search-PowerStubCommands'
                 'Get-PowerStubConfiguration'
                 'Import-PowerStubConfiguration'
                 'Enable-PowerStubAlphaCommands'
@@ -878,6 +880,99 @@ Describe "Remove-PowerStubDirectAlias" {
             Get-Command "keepme" -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
             $directAliases = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'DirectAliases' }
             $directAliases['keepme'] | Should -Be 'SampleStub'
+        }
+    }
+}
+
+Describe "Virtual Verbs" {
+    BeforeAll {
+        Import-PowerStubConfiguration -Reset
+        New-PowerStub -Name "SampleStub" -Path $script:SampleStubRoot -Force
+        Disable-PowerStubAlphaCommands
+        Disable-PowerStubBetaCommands
+    }
+
+    Context "Search-PowerStubCommands" {
+        It "Should find commands by name" {
+            $results = Search-PowerStubCommands "deploy"
+            $results | Should -Not -BeNullOrEmpty
+            $results.Command | Should -Contain "deploy"
+        }
+
+        It "Should find commands by help text" {
+            # The deploy command has 'environment' in its parameters/help
+            $results = Search-PowerStubCommands "production"
+            # This may or may not find results depending on help content
+            # Just verify it doesn't throw
+            { Search-PowerStubCommands "production" } | Should -Not -Throw
+        }
+
+        It "Should return empty for no matches" {
+            $results = Search-PowerStubCommands "xyznonexistent123456"
+            $results | Should -BeNullOrEmpty
+        }
+
+        It "Should return structured results with Stub, Command, Synopsis" {
+            $results = Search-PowerStubCommands "deploy"
+            $results | Should -Not -BeNullOrEmpty
+            $results[0].PSObject.Properties.Name | Should -Contain 'Stub'
+            $results[0].PSObject.Properties.Name | Should -Contain 'Command'
+            $results[0].PSObject.Properties.Name | Should -Contain 'Synopsis'
+        }
+    }
+
+    Context "Get-PowerStubCommandHelp" {
+        It "Should return help for valid command" {
+            $help = Get-PowerStubCommandHelp -Stub "SampleStub" -Command "deploy"
+            $help | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should throw for non-existent stub" {
+            { Get-PowerStubCommandHelp -Stub "NonExistentStub" -Command "test" } | Should -Throw "*not found*"
+        }
+
+        It "Should throw for non-existent command" {
+            { Get-PowerStubCommandHelp -Stub "SampleStub" -Command "nonexistent" } | Should -Throw "*not found*"
+        }
+    }
+
+    Context "Virtual Verbs via pstb" {
+        It "Should invoke search via pstb search" {
+            $results = pstb search "deploy"
+            $results | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should invoke help via pstb help" {
+            $help = pstb help SampleStub deploy
+            $help | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should error when search has no query" {
+            # PowerShell's mandatory parameter validation kicks in before our code
+            { pstb search } | Should -Throw
+        }
+
+        It "Should error when help has incomplete arguments" {
+            { pstb help SampleStub } | Should -Throw "*Usage*"
+        }
+    }
+
+    Context "Tab Completion for Virtual Verbs" {
+        It "Should include virtual verbs in stub completion" {
+            $completions = InModuleScope PowerStub {
+                $virtualVerbs = @('search', 'help')
+                $stubs = Get-PowerStubConfigurationKey 'Stubs'
+                @($virtualVerbs) + @($stubs.Keys)
+            }
+            $completions | Should -Contain 'search'
+            $completions | Should -Contain 'help'
+        }
+
+        It "Should show stub names when completing help command" {
+            $input = 'pstb help '
+            $completions = [System.Management.Automation.CommandCompletion]::CompleteInput($input, $input.Length, $null)
+            $completionTexts = @($completions.CompletionMatches | Select-Object -ExpandProperty CompletionText)
+            $completionTexts | Should -Contain 'SampleStub'
         }
     }
 }

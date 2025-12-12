@@ -43,10 +43,15 @@ Write-Verbose "Setting up argument completer for Invoke-PowerStubCommand STUB pa
 $StubCompleter = {
     param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameters)
 
-    $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    if (!$stringMatch) { return @($stubs.Keys) }
+    # Virtual verbs (reserved commands)
+    $virtualVerbs = @('search', 'help')
 
-    $PartialMatches = @($stubs.Keys | Where-Object { $_ -like "$stringMatch*" })
+    $stubs = Get-PowerStubConfigurationKey 'Stubs'
+    $allOptions = @($virtualVerbs) + @($stubs.Keys)
+
+    if (!$stringMatch) { return $allOptions }
+
+    $PartialMatches = @($allOptions | Where-Object { $_ -like "$stringMatch*" })
     return $PartialMatches
 }
 
@@ -61,6 +66,20 @@ $CommandCompleter = {
 
     $stub = $fakeBoundParameters['Stub']
     if (!$stub) { return @() }
+
+    # Handle virtual verb completions
+    if ($stub -eq 'help') {
+        # For 'help' verb, the command parameter should show stub names
+        $stubs = Get-PowerStubConfigurationKey 'Stubs'
+        $stubNames = @($stubs.Keys)
+        if (!$stringMatch) { return $stubNames }
+        return @($stubNames | Where-Object { $_ -like "$stringMatch*" })
+    }
+
+    if ($stub -eq 'search') {
+        # For 'search' verb, no completion (user types query)
+        return @()
+    }
 
     $commands = @(Find-PowerStubCommands $stub)
     if (!$commands) { return @() }

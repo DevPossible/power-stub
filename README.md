@@ -31,6 +31,8 @@ pstb DevOps deploy-app -Environment prod
 - **Multi-format Support**: Works with `.ps1` scripts and `.exe` executables
 - **Lifecycle Prefixes**: Built-in support for `alpha.*` and `beta.*` command stages
 - **Zero PATH Pollution**: Single alias (`pstb`) provides access to all your tools
+- **Built-in Commands**: Search across stubs and get help for any command
+- **Direct Aliases**: Create shortcut aliases for frequently used stubs
 
 ## Installation
 
@@ -127,6 +129,48 @@ pstb DevOps deploy-app -Environment prod -Version 2.0.1
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `Invoke-PowerStubCommand -Stub <name> -Command <cmd>` | `pstb` | Execute a command from a stub |
+| `pstb` (no args) | | Show overview with stubs and built-in commands |
+| `pstb <stub>` (no command) | | List commands in the stub |
+
+### Built-in Commands
+
+These virtual commands work across all stubs without needing script files:
+
+| Command | Description |
+|---------|-------------|
+| `pstb search <query>` | Search commands by name or help text across all stubs |
+| `pstb help <stub> <command>` | Display PowerShell help for a specific command |
+
+```powershell
+# Find all commands related to "deploy"
+pstb search "deploy"
+
+# Get detailed help for a command
+pstb help DevOps deploy-app
+```
+
+### Direct Aliases
+
+Create shortcut aliases for frequently used stubs:
+
+| Command | Description |
+|---------|-------------|
+| `New-PowerStubDirectAlias -AliasName <alias> -Stub <stub>` | Create a direct alias for a stub |
+| `Remove-PowerStubDirectAlias -AliasName <alias>` | Remove a direct alias |
+
+```powershell
+# Create a short alias for your DevOps stub
+New-PowerStubDirectAlias -AliasName "do" -Stub "DevOps"
+
+# Now use the shorter syntax
+do deploy-app -Environment prod    # Same as: pstb DevOps deploy-app -Environment prod
+do                                 # List commands in DevOps
+
+# Remove the alias when no longer needed
+Remove-PowerStubDirectAlias -AliasName "do"
+```
+
+Direct aliases are persisted and automatically restored when the module loads.
 
 ### Configuration Commands
 
@@ -254,14 +298,14 @@ pstb DevOps terraform plan -out=tfplan
 ```text
 PowerStub/                          # Repository root
 ├── PowerStub/                      # Module folder (publishable to PSGallery)
-│   ├── Public/functions/           # Exported user-facing functions (11)
-│   ├── Private/functions/          # Internal helper functions (10)
+│   ├── Public/functions/           # Exported user-facing functions (16)
+│   ├── Private/functions/          # Internal helper functions (11)
 │   ├── Templates/                  # Command templates
 │   ├── PowerStub.psm1              # Module loader
 │   ├── PowerStub.psd1              # Module manifest
 │   └── PowerStub.json              # Runtime configuration
 ├── tests/                          # Pester test files
-│   ├── PowerStub.tests.ps1         # Main test suite
+│   ├── PowerStub.tests.ps1         # Main test suite (86 tests)
 │   └── sample_stub_root/           # Sample stub for integration tests
 ├── dev-reload.ps1                  # Reload module for local testing
 ├── dev-test.ps1                    # Run Pester test suite
@@ -377,6 +421,8 @@ Tests are located in `tests/PowerStub.tests.ps1` and cover:
 | Command Discovery | Direct files, subfolders, helper isolation |
 | Alpha/Beta Prefixes | Enable/disable, precedence order |
 | Command Execution | Parameter passing, output capture |
+| Direct Aliases | Create, remove, tab completion for aliases |
+| Virtual Verbs | Search and help built-in commands |
 
 The `tests/sample_stub_root/` folder contains a pre-configured stub with various command types for integration testing.
 
