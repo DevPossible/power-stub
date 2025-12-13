@@ -166,7 +166,9 @@ if ($psrlModule) {
 Write-Verbose "Registering saved direct aliases"
 $directAliases = Get-PowerStubConfigurationKey 'DirectAliases'
 if ($directAliases) {
-    foreach ($aliasName in $directAliases.Keys) {
+    # Copy keys to array to avoid "Collection was modified" error during enumeration
+    $aliasNames = @($directAliases.Keys)
+    foreach ($aliasName in $aliasNames) {
         $stubName = $directAliases[$aliasName]
         # Only re-register if the stub still exists
         $stubs = Get-PowerStubConfigurationKey 'Stubs'
@@ -187,7 +189,9 @@ if ($directAliases) {
 if ($Script:GitEnabled) {
     Write-Verbose "Checking Git status for stubs"
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    foreach ($stubName in $stubs.Keys) {
+    # Copy keys to array to avoid "Collection was modified" error during enumeration
+    $stubNames = @($stubs.Keys)
+    foreach ($stubName in $stubNames) {
         $stubConfig = $stubs[$stubName]
         # Check if stub config is a hashtable with GitRepoUrl
         if ($stubConfig -is [hashtable] -and $stubConfig.GitRepoUrl) {
