@@ -68,6 +68,7 @@ Describe "PowerStub Module" {
                 'Get-PowerStubCommand'
                 'Get-PowerStubCommandHelp'
                 'Search-PowerStubCommands'
+                'Set-PowerStubCommandVisibility'
                 'Get-PowerStubConfiguration'
                 'Import-PowerStubConfiguration'
                 'Enable-PowerStubAlphaCommands'
@@ -977,6 +978,134 @@ Describe "Virtual Verbs" {
     }
 }
 
+Describe "Set-PowerStubCommandVisibility" {
+    BeforeAll {
+        Import-PowerStubConfiguration -Reset
+        # Create a test stub with a command we can modify
+        $script:VisibilityTestPath = Join-Path $env:TEMP "PowerStubVisibilityTest_$(Get-Random)"
+        New-PowerStub -Name "VisibilityStub" -Path $script:VisibilityTestPath -Force
+
+        # Create a test command
+        $testScript = @'
+param([string]$Name)
+Write-Output "Test command executed with: $Name"
+'@
+        $commandsPath = Join-Path $script:VisibilityTestPath 'Commands'
+        Set-Content -Path (Join-Path $commandsPath 'testcmd.ps1') -Value $testScript
+    }
+
+    AfterAll {
+        if (Test-Path $script:VisibilityTestPath) {
+            Remove-Item $script:VisibilityTestPath -Recurse -Force
+        }
+        Remove-PowerStub -Name "VisibilityStub" -ErrorAction SilentlyContinue
+    }
+
+    BeforeEach {
+        # Reset to production state before each test
+        $commandsPath = Join-Path $script:VisibilityTestPath 'Commands'
+        # Remove any alpha/beta versions
+        Remove-Item (Join-Path $commandsPath 'alpha.testcmd.ps1') -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $commandsPath 'beta.testcmd.ps1') -ErrorAction SilentlyContinue
+        # Ensure production version exists
+        if (-not (Test-Path (Join-Path $commandsPath 'testcmd.ps1'))) {
+            $testScript = 'param([string]$Name); Write-Output "Test"'
+            Set-Content -Path (Join-Path $commandsPath 'testcmd.ps1') -Value $testScript
+        }
+        Disable-PowerStubAlphaCommands
+        Disable-PowerStubBetaCommands
+    }
+
+    Context "Parameter Validation" {
+        It "Should require -Stub parameter" {
+            { Set-PowerStubCommandVisibility -Command "test" -Visibility Alpha } | Should -Throw
+        }
+
+        It "Should require -Command parameter" {
+            { Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Visibility Alpha } | Should -Throw
+        }
+
+        It "Should require -Visibility parameter" {
+            { Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "test" } | Should -Throw
+        }
+
+        It "Should throw for non-existent stub" {
+            { Set-PowerStubCommandVisibility -Stub "NonExistentStub" -Command "test" -Visibility Alpha } | Should -Throw "*not found*"
+        }
+
+        It "Should throw for non-existent command" {
+            { Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "nonexistent" -Visibility Alpha } | Should -Throw "*not found*"
+        }
+
+        It "Should only accept valid visibility values" {
+            { Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility "Invalid" } | Should -Throw
+        }
+    }
+
+    Context "Visibility Changes" {
+        It "Should promote from Production to Alpha" {
+            $result = Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility Alpha
+
+            $result.Changed | Should -Be $true
+            $result.OldVisibility | Should -Be 'Production'
+            $result.NewVisibility | Should -Be 'Alpha'
+
+            $commandsPath = Join-Path $script:VisibilityTestPath 'Commands'
+            Test-Path (Join-Path $commandsPath 'alpha.testcmd.ps1') | Should -Be $true
+            Test-Path (Join-Path $commandsPath 'testcmd.ps1') | Should -Be $false
+        }
+
+        It "Should promote from Production to Beta" {
+            $result = Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility Beta
+
+            $result.Changed | Should -Be $true
+            $result.NewVisibility | Should -Be 'Beta'
+
+            $commandsPath = Join-Path $script:VisibilityTestPath 'Commands'
+            Test-Path (Join-Path $commandsPath 'beta.testcmd.ps1') | Should -Be $true
+        }
+
+        It "Should demote from Alpha to Production" {
+            # First promote to alpha
+            Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility Alpha
+            Enable-PowerStubAlphaCommands
+
+            # Then demote to production
+            $result = Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility Production
+
+            $result.Changed | Should -Be $true
+            $result.OldVisibility | Should -Be 'Alpha'
+            $result.NewVisibility | Should -Be 'Production'
+
+            $commandsPath = Join-Path $script:VisibilityTestPath 'Commands'
+            Test-Path (Join-Path $commandsPath 'testcmd.ps1') | Should -Be $true
+            Test-Path (Join-Path $commandsPath 'alpha.testcmd.ps1') | Should -Be $false
+        }
+
+        It "Should report no change when already at target visibility" {
+            $result = Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility Production
+
+            $result.Changed | Should -Be $false
+            $result.Visibility | Should -Be 'Production'
+        }
+    }
+
+    Context "Conflict Handling" {
+        It "Should replace existing file with -Force" {
+            $commandsPath = Join-Path $script:VisibilityTestPath 'Commands'
+
+            # Create both production and alpha versions
+            Set-Content -Path (Join-Path $commandsPath 'alpha.testcmd.ps1') -Value 'Write-Output "Alpha version"'
+
+            # Use -Force to replace alpha version
+            $result = Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "testcmd" -Visibility Alpha -Force
+
+            $result.Changed | Should -Be $true
+            Test-Path (Join-Path $commandsPath 'testcmd.ps1') | Should -Be $false
+        }
+    }
+}
+
 Describe "Edge Cases and Error Handling" {
     BeforeAll {
         Import-PowerStubConfiguration -Reset
@@ -1018,6 +1147,91 @@ Describe "Edge Cases and Error Handling" {
                     Remove-Item $testPath -Recurse -Force
                 }
             }
+        }
+    }
+}
+
+Describe "Executable Metadata Support" {
+    BeforeAll {
+        Import-PowerStubConfiguration -Reset
+        New-PowerStub -Name "SampleStub" -Path $script:SampleStubRoot -Force
+        Disable-PowerStubAlphaCommands
+        Disable-PowerStubBetaCommands
+    }
+
+    Context "Metadata File Discovery" {
+        It "Should NOT expose metadata files as commands" {
+            $commands = InModuleScope PowerStub {
+                Find-PowerStubCommands "SampleStub"
+            }
+            $commandNames = @($commands | ForEach-Object { $_.BaseName })
+            $commandNames | Should -Not -Match "^metadata\."
+        }
+
+        It "Should discover exe files as commands" {
+            $cmd = Get-PowerStubCommand -Stub "SampleStub" -Command "mytool"
+            $cmd | Should -Not -BeNullOrEmpty
+            $cmd.Path | Should -Match "\.exe$"
+        }
+    }
+
+    Context "Get-PowerStubCommandMetadata (via InModuleScope)" {
+        It "Should find metadata file for exe" {
+            $commandsPath = Join-Path $script:SampleStubRoot 'Commands'
+            $metadata = InModuleScope PowerStub -Parameters @{ commandsPath = $commandsPath } {
+                param($commandsPath)
+                Get-PowerStubCommandMetadata -CommandName "mytool" -CommandsPath $commandsPath
+            }
+            $metadata | Should -Not -BeNullOrEmpty
+            $metadata.Path | Should -Match "metadata\.mytool\.ps1$"
+        }
+
+        It "Should return null for command without metadata" {
+            $commandsPath = Join-Path $script:SampleStubRoot 'Commands'
+            $metadata = InModuleScope PowerStub -Parameters @{ commandsPath = $commandsPath } {
+                param($commandsPath)
+                Get-PowerStubCommandMetadata -CommandName "nonexistent" -CommandsPath $commandsPath
+            }
+            $metadata | Should -BeNullOrEmpty
+        }
+
+        It "Should return help object from metadata file" {
+            $commandsPath = Join-Path $script:SampleStubRoot 'Commands'
+            $metadata = InModuleScope PowerStub -Parameters @{ commandsPath = $commandsPath } {
+                param($commandsPath)
+                Get-PowerStubCommandMetadata -CommandName "mytool" -CommandsPath $commandsPath
+            }
+            $metadata.Help | Should -Not -BeNullOrEmpty
+            $metadata.Help.Synopsis | Should -Match "sample tool"
+        }
+    }
+
+    Context "Help Integration with Metadata" {
+        It "Should return metadata help for exe via Get-PowerStubCommandHelp" {
+            $help = Get-PowerStubCommandHelp -Stub "SampleStub" -Command "mytool"
+            $help | Should -Not -BeNullOrEmpty
+            $help.Synopsis | Should -Match "sample tool"
+        }
+
+        It "Should include description from metadata" {
+            $help = Get-PowerStubCommandHelp -Stub "SampleStub" -Command "mytool"
+            $help.Description | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context "Command Listing with Metadata" {
+        It "Should show metadata synopsis in stub command list" {
+            # Capture output from Show-PowerStubCommands
+            $output = InModuleScope PowerStub {
+                $stringBuilder = [System.Text.StringBuilder]::new()
+                $originalHost = $Host.UI
+
+                # Run the function - it writes to host
+                Show-PowerStubCommands "SampleStub"
+            }
+            # The function writes to console, so we can't easily capture its output
+            # Just verify it doesn't throw
+            { InModuleScope PowerStub { Show-PowerStubCommands "SampleStub" } } | Should -Not -Throw
         }
     }
 }

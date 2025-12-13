@@ -7,6 +7,9 @@
     in a registered stub. This includes synopsis, description, parameters,
     and examples.
 
+    For executables (.exe), looks for a metadata.<command>.ps1 file that
+    contains the help documentation.
+
 .PARAMETER Stub
     The name of the stub containing the command.
 
@@ -49,8 +52,23 @@ function Get-PowerStubCommandHelp {
         throw "Command '$Command' not found in stub '$Stub'."
     }
 
-    # Get and return help
-    $help = Get-Help $cmd.Path -Full -ErrorAction SilentlyContinue
+    $stubConfig = $stubs[$Stub]
+    # Extract path from stub config (handles both string and hashtable formats)
+    $stubRoot = Get-PowerStubPath -StubConfig $stubConfig
+    $commandsPath = Join-Path $stubRoot 'Commands'
+    $help = $null
+
+    # For executables, check for metadata file first
+    if ($cmd.Path -match '\.exe$') {
+        $metadata = Get-PowerStubCommandMetadata -CommandName $Command -CommandsPath $commandsPath
+        if ($metadata -and $metadata.Help) {
+            $help = $metadata.Help
+        }
+    }
+    else {
+        # For .ps1 files, get help directly
+        $help = Get-Help $cmd.Path -Full -ErrorAction SilentlyContinue
+    }
 
     if (-not $help -or $help.Synopsis -eq $cmd.Path) {
         # No help defined, return basic info

@@ -33,6 +33,7 @@ pstb DevOps deploy-app -Environment prod
 - **Zero PATH Pollution**: Single alias (`pstb`) provides access to all your tools
 - **Built-in Commands**: Search across stubs and get help for any command
 - **Direct Aliases**: Create shortcut aliases for frequently used stubs
+- **Git Integration**: Automatic detection and updates for Git-based stub repositories
 
 ## Installation
 
@@ -140,6 +141,7 @@ These virtual commands work across all stubs without needing script files:
 |---------|-------------|
 | `pstb search <query>` | Search commands by name or help text across all stubs |
 | `pstb help <stub> <command>` | Display PowerShell help for a specific command |
+| `pstb update [stub]` | Update Git repositories for stubs |
 
 ```powershell
 # Find all commands related to "deploy"
@@ -147,6 +149,12 @@ pstb search "deploy"
 
 # Get detailed help for a command
 pstb help DevOps deploy-app
+
+# Update all Git-tracked stubs
+pstb update
+
+# Update a specific stub's Git repository
+pstb update DevOps
 ```
 
 ### Direct Aliases
@@ -188,6 +196,18 @@ Direct aliases are persisted and automatically restored when the module loads.
 | `Disable-PowerStubAlphaCommands` | Hide alpha commands |
 | `Enable-PowerStubBetaCommands` | Show `beta.*` prefixed commands |
 | `Disable-PowerStubBetaCommands` | Hide beta commands |
+| `Set-PowerStubCommandVisibility -Stub <s> -Command <c> -Visibility <v>` | Change command lifecycle stage |
+
+```powershell
+# Promote a command from production to alpha (work-in-progress)
+Set-PowerStubCommandVisibility -Stub DevOps -Command deploy -Visibility Alpha
+
+# Promote to beta testing
+Set-PowerStubCommandVisibility -Stub DevOps -Command deploy -Visibility Beta
+
+# Release to production
+Set-PowerStubCommandVisibility -Stub DevOps -Command deploy -Visibility Production
+```
 
 ## Configuration File
 
@@ -209,10 +229,11 @@ PowerStub stores its configuration in `PowerStub.json`, located in the module di
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `Stubs` | Object | `{}` | Map of stub names to root paths |
+| `Stubs` | Object | `{}` | Map of stub names to root paths (or config objects with GitRepoUrl) |
 | `InvokeAlias` | String | `pstb` | Alias for `Invoke-PowerStubCommand` |
 | `EnablePrefix:Alpha` | Boolean | `false` | Include `alpha.*` prefixed commands |
 | `EnablePrefix:Beta` | Boolean | `false` | Include `beta.*` prefixed commands |
+| `GitEnabled` | Boolean | `true` | Enable Git integration (auto-detected on load) |
 
 ## Command Lifecycle
 
@@ -244,6 +265,51 @@ YourStub/Commands/
 
 When multiple versions exist (e.g., `alpha.deploy.ps1`, `beta.deploy.ps1`, `deploy.ps1`),
 the command resolves in precedence order based on enabled modes. This applies to both direct files and files in subfolders.
+
+## Git Integration
+
+PowerStub integrates with Git to help you keep your stub repositories up to date.
+
+### Automatic Detection
+
+When you register a new stub with `New-PowerStub`, PowerStub automatically detects if the path is part of a Git repository and saves the remote URL in the configuration.
+
+```powershell
+# If C:\Tools\DevOps is a Git repo, the remote URL is saved automatically
+New-PowerStub -Name "DevOps" -Path "C:\Tools\DevOps"
+```
+
+### Update Notifications
+
+When the PowerStub module loads, it checks each Git-tracked stub to see if it's behind the remote repository:
+
+```text
+Stub 'DevOps' is 5 commit(s) behind the remote repo. Run 'pstb update DevOps' to update.
+```
+
+### Updating Repositories
+
+Use the `update` command to pull the latest changes:
+
+```powershell
+# Update all Git-tracked stubs
+pstb update
+
+# Update a specific stub
+pstb update DevOps
+```
+
+### Configuration
+
+Git integration is enabled by default when Git is available. You can disable it:
+
+```powershell
+# Disable Git integration
+Set-PowerStubConfigurationKey 'GitEnabled' $false
+
+# Re-enable Git integration
+Set-PowerStubConfigurationKey 'GitEnabled' $true
+```
 
 ## Examples
 
@@ -298,14 +364,14 @@ pstb DevOps terraform plan -out=tfplan
 ```text
 PowerStub/                          # Repository root
 ├── PowerStub/                      # Module folder (publishable to PSGallery)
-│   ├── Public/functions/           # Exported user-facing functions (16)
+│   ├── Public/functions/           # Exported user-facing functions (17)
 │   ├── Private/functions/          # Internal helper functions (11)
 │   ├── Templates/                  # Command templates
 │   ├── PowerStub.psm1              # Module loader
 │   ├── PowerStub.psd1              # Module manifest
 │   └── PowerStub.json              # Runtime configuration
 ├── tests/                          # Pester test files
-│   ├── PowerStub.tests.ps1         # Main test suite (86 tests)
+│   ├── PowerStub.tests.ps1         # Main test suite (97 tests)
 │   └── sample_stub_root/           # Sample stub for integration tests
 ├── dev-reload.ps1                  # Reload module for local testing
 ├── dev-test.ps1                    # Run Pester test suite

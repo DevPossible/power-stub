@@ -13,13 +13,13 @@ PowerStub is a PowerShell module that creates command proxies ("stubs") for orga
 ```text
 PowerStub/                        # Repository root
 ├── PowerStub/                    # Module directory (publishable to PSGallery)
-│   ├── Public/functions/         # 16 exported user-facing functions
+│   ├── Public/functions/         # 17 exported user-facing functions
 │   ├── Private/functions/        # 11 internal helper functions
 │   ├── Templates/                # Command templates
 │   ├── PowerStub.psm1            # Module loader (dot-sources all functions)
 │   ├── PowerStub.psd1            # Module manifest (version 2.0)
 │   └── PowerStub.json            # Runtime configuration
-├── tests/                        # Pester test files (at repo root, 86 tests)
+├── tests/                        # Pester test files (at repo root, 97 tests)
 ├── .claude/commands/             # Claude Code slash commands
 ├── README.md                     # User documentation
 ├── CLAUDE.md                     # This file
@@ -41,6 +41,7 @@ PowerStub/                        # Repository root
 | `Search-PowerStubCommands.ps1` | Search | Searches commands across all stubs |
 | `New-PowerStubDirectAlias.ps1` | Alias creation | Creates shortcut alias for a stub |
 | `Remove-PowerStubDirectAlias.ps1` | Alias removal | Removes a direct alias |
+| `Set-PowerStubCommandVisibility.ps1` | Lifecycle | Changes command visibility (alpha/beta/production) |
 | `Get-PowerStubConfiguration.ps1` | Config read | Returns current configuration |
 | `Import-PowerStubConfiguration.ps1` | Config load | Loads/resets config from JSON |
 | `Enable-PowerStubBetaCommands.ps1` | Toggle | Shows beta.* prefixed commands |
@@ -63,6 +64,9 @@ PowerStub/                        # Repository root
 | `Set-PowerStubConfigurationKey.ps1` | Config | Sets single config key |
 | `Set-PowerStubConfiguration.ps1` | Config | Sets entire config object |
 | `Export-PowerStubConfiguration.ps1` | Config | Saves config to PowerStub.json |
+| `Get-PowerStubGitInfo.ps1` | Git | Gets git repo info for a path |
+| `Update-PowerStubGitRepo.ps1` | Git | Updates a git repo (git pull) |
+| `Get-PowerStubPath.ps1` | Utility | Extracts path from stub config (string or hashtable) |
 
 ## Architecture Patterns
 
@@ -82,8 +86,41 @@ Virtual verbs are built-in commands that don't map to script files:
 
 - `pstb search <query>` - Searches all stubs for commands matching query
 - `pstb help <stub> <command>` - Displays PowerShell help for a command
+- `pstb update [stub]` - Updates git repositories for stubs
 
 Virtual verbs are intercepted in `Invoke-PowerStubCommand` before stub resolution.
+
+### Git Integration
+
+PowerStub integrates with Git to track and update stub repositories:
+
+**Module-scoped flags:**
+
+- `$Script:GitAvailable` - Set on module load by checking `Get-Command git`
+- `$Script:GitEnabled` - Defaults to `$true` if git is available; can be disabled via config
+
+**Stub registration:**
+When creating a new stub with `New-PowerStub`, if git is enabled and the path is part of a git repository, the remote URL is automatically saved in the configuration.
+
+**Module load behavior:**
+On module load, each stub's git repo is checked. If the repo is behind the remote, a warning is displayed:
+
+```text
+Stub 'DevOps' is 5 commit(s) behind the remote repo. Run 'pstb update DevOps' to update.
+```
+
+**Update command:**
+
+- `pstb update` - Updates all unique git repos across all stubs
+- `pstb update <stub>` - Updates the specific stub's git repo
+
+**Stub configuration format:**
+Stubs can be stored in two formats:
+
+- **Legacy (string):** Just the path: `"C:\MyStub"`
+- **New (hashtable):** Path with git info: `@{ Path = "C:\MyStub"; GitRepoUrl = "https://..." }`
+
+The `Get-PowerStubPath` helper function handles both formats transparently.
 
 ### Direct Aliases
 
@@ -209,7 +246,7 @@ Import-PowerStubConfiguration -Reset
 
 ## Testing Approach
 
-Tests use Pester framework (86 tests). Key test areas:
+Tests use Pester framework (97 tests). Key test areas:
 
 - Configuration loading/saving
 - Stub registration/removal
@@ -222,6 +259,7 @@ Tests use Pester framework (86 tests). Key test areas:
 - Smart parameter filtering (filters already-bound positional params)
 - Direct aliases (create, remove, persistence, tab completion)
 - Virtual verbs (search, help commands)
+- Command visibility changes (alpha/beta/production lifecycle)
 
 ## Claude Commands
 

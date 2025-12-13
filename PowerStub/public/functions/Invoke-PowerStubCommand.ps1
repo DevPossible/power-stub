@@ -58,7 +58,7 @@ function Invoke-PowerStubCommand {
         }
 
         # Virtual verb handling - these are reserved commands that don't map to script files
-        $virtualVerbs = @('search', 'help')
+        $virtualVerbs = @('search', 'help', 'update')
         if ($virtualVerbs -contains $stub) {
             switch ($stub) {
                 'search' {
@@ -81,11 +81,71 @@ function Invoke-PowerStubCommand {
                         throw "Usage: pstb help <stub> <command>"
                     }
                 }
+                'update' {
+                    # Update git repos for stubs
+                    if (-not $Script:GitEnabled) {
+                        throw "Git integration is disabled. Enable it with: Set-PowerStubConfigurationKey 'GitEnabled' `$true"
+                    }
+                    if (-not $Script:GitAvailable) {
+                        throw "Git is not available on this system."
+                    }
+
+                    $stubs = Get-PowerStubConfigurationKey 'Stubs'
+                    $updatedRepos = @{}
+
+                    if ($command) {
+                        # Update specific stub
+                        if (-not ($stubs.Keys -contains $command)) {
+                            throw "Stub '$command' not found."
+                        }
+                        $stubConfig = $stubs[$command]
+                        $stubPath = Get-PowerStubPath -StubConfig $stubConfig
+                        $gitInfo = Get-PowerStubGitInfo -Path $stubPath
+                        if (-not $gitInfo.IsRepo) {
+                            throw "Stub '$command' is not in a Git repository."
+                        }
+                        Write-Host "Updating stub '$command'..." -ForegroundColor Cyan
+                        $result = Update-PowerStubGitRepo -Path $stubPath
+                        if ($result.Success) {
+                            Write-Host "  $($result.Message)" -ForegroundColor Green
+                        }
+                        else {
+                            Write-Host "  $($result.Message)" -ForegroundColor Red
+                        }
+                    }
+                    else {
+                        # Update all unique git repos across all stubs
+                        foreach ($stubName in $stubs.Keys) {
+                            $stubConfig = $stubs[$stubName]
+                            $stubPath = Get-PowerStubPath -StubConfig $stubConfig
+                            $gitInfo = Get-PowerStubGitInfo -Path $stubPath
+                            if ($gitInfo.IsRepo -and $gitInfo.RepoRoot -and -not $updatedRepos.ContainsKey($gitInfo.RepoRoot)) {
+                                Write-Host "Updating stub '$stubName' ($($gitInfo.RepoRoot))..." -ForegroundColor Cyan
+                                $result = Update-PowerStubGitRepo -Path $stubPath
+                                if ($result.Success) {
+                                    Write-Host "  $($result.Message)" -ForegroundColor Green
+                                }
+                                else {
+                                    Write-Host "  $($result.Message)" -ForegroundColor Red
+                                }
+                                $updatedRepos[$gitInfo.RepoRoot] = $true
+                            }
+                        }
+                        if ($updatedRepos.Count -eq 0) {
+                            Write-Host "No stubs with Git repositories found." -ForegroundColor Yellow
+                        }
+                        else {
+                            Write-Host "`nUpdated $($updatedRepos.Count) repository(ies)." -ForegroundColor Cyan
+                        }
+                    }
+                    return
+                }
             }
         }
 
         if (!$command) {
-            return Find-PowerStubCommands $stub
+            Show-PowerStubCommands $stub
+            return
         }
 
         $commandObj = Get-PowerStubCommand $stub $command

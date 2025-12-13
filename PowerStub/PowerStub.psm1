@@ -27,6 +27,22 @@ Write-Verbose 'Dot-sourcing functions'
 $Script:PSTBSettings = Get-PowerStubConfigurationDefaults
 Import-PowerStubConfiguration
 
+# Check for Git availability and set module-scoped flags
+Write-Verbose "Checking Git availability"
+$Script:GitAvailable = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+if ($Script:GitAvailable) {
+    Write-Verbose "Git is available"
+    Set-PowerStubConfigurationKey 'GitAvailable' $true
+    # GitEnabled defaults to true if available, but can be overridden by config
+    $configEnabled = Get-PowerStubConfigurationKey 'GitEnabled'
+    $Script:GitEnabled = if ($null -eq $configEnabled) { $true } else { $configEnabled }
+} else {
+    Write-Verbose "Git is not available"
+    Set-PowerStubConfigurationKey 'GitAvailable' $false
+    $Script:GitEnabled = $false
+}
+Write-Verbose "Git enabled: $Script:GitEnabled"
+
 #export public functions only
 [string[]]$exports = @($publicFn | Select-Object -ExpandProperty BaseName)
 Write-Verbose "Exporting $($exports.Count) functions"
@@ -44,7 +60,7 @@ $StubCompleter = {
     param($commandName, $parameterName, $stringMatch, $commandAst, $fakeBoundParameters)
 
     # Virtual verbs (reserved commands)
-    $virtualVerbs = @('search', 'help')
+    $virtualVerbs = @('search', 'help', 'update')
 
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
     $allOptions = @($virtualVerbs) + @($stubs.Keys)
@@ -79,6 +95,14 @@ $CommandCompleter = {
     if ($stub -eq 'search') {
         # For 'search' verb, no completion (user types query)
         return @()
+    }
+
+    if ($stub -eq 'update') {
+        # For 'update' verb, the command parameter should show stub names (or empty for all)
+        $stubs = Get-PowerStubConfigurationKey 'Stubs'
+        $stubNames = @($stubs.Keys)
+        if (!$stringMatch) { return $stubNames }
+        return @($stubNames | Where-Object { $_ -like "$stringMatch*" })
     }
 
     $commands = @(Find-PowerStubCommands $stub)
@@ -155,6 +179,30 @@ if ($directAliases) {
             }
         } else {
             Write-Verbose "Skipping alias '$aliasName' - stub '$stubName' no longer exists"
+        }
+    }
+}
+
+# Check Git status for stubs with configured repos
+if ($Script:GitEnabled) {
+    Write-Verbose "Checking Git status for stubs"
+    $stubs = Get-PowerStubConfigurationKey 'Stubs'
+    foreach ($stubName in $stubs.Keys) {
+        $stubConfig = $stubs[$stubName]
+        # Check if stub config is a hashtable with GitRepoUrl
+        if ($stubConfig -is [hashtable] -and $stubConfig.GitRepoUrl) {
+            $stubPath = $stubConfig.Path
+            $gitInfo = Get-PowerStubGitInfo -Path $stubPath
+            if ($gitInfo.IsRepo -and $gitInfo.BehindCount -gt 0) {
+                Write-Host "Stub '$stubName' is $($gitInfo.BehindCount) commit(s) behind the remote repo. Run 'pstb update $stubName' to update." -ForegroundColor Yellow
+            }
+        }
+        # Also check if it's just a path string and in a git repo
+        elseif ($stubConfig -is [string]) {
+            $gitInfo = Get-PowerStubGitInfo -Path $stubConfig
+            if ($gitInfo.IsRepo -and $gitInfo.RemoteUrl -and $gitInfo.BehindCount -gt 0) {
+                Write-Host "Stub '$stubName' is $($gitInfo.BehindCount) commit(s) behind the remote repo. Run 'pstb update $stubName' to update." -ForegroundColor Yellow
+            }
         }
     }
 }

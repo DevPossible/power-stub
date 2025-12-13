@@ -38,12 +38,15 @@ function Get-PowerStubCommand {
     $alpha = Get-PowerStubConfigurationKey 'EnablePrefix:Alpha'
     $beta = Get-PowerStubConfigurationKey 'EnablePrefix:Beta'
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    $stubRoot = $stubs.$stub
+    $stubConfig = $stubs.$stub
 
-    if (!$stubRoot) {
+    if (!$stubConfig) {
         Write-Warning "Stub '$stub' not found in the configuration."
         return
     }
+
+    # Extract path from stub config (handles both string and hashtable formats)
+    $stubRoot = Get-PowerStubPath -StubConfig $stubConfig
 
     $commandsPath = Join-Path $stubRoot 'Commands'
     $commandFile = $null

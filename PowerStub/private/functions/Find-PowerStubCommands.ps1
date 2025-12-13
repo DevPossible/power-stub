@@ -9,6 +9,7 @@
 
   This prevents helper scripts and supporting files from being exposed as commands.
   Filters out 'alpha.' or 'beta.' prefixed commands unless those modes are enabled.
+  Excludes 'metadata.*' files which provide help for executables.
 
 .LINK
 
@@ -33,12 +34,15 @@ function Find-PowerStubCommands {
     $alpha = Get-PowerStubConfigurationKey 'EnablePrefix:Alpha'
     $beta = Get-PowerStubConfigurationKey 'EnablePrefix:Beta'
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    $stubRoot = $stubs.$stub
+    $stubConfig = $stubs.$stub
 
-    if (!$stubRoot) {
+    if (!$stubConfig) {
         Write-Warning "Stub '$stub' not found in the configuration."
         return
     }
+
+    # Extract path from stub config (handles both string and hashtable formats)
+    $stubRoot = Get-PowerStubPath -StubConfig $stubConfig
 
     $commandsPath = Join-Path $stubRoot 'Commands'
     $commands = @()
@@ -73,6 +77,9 @@ function Find-PowerStubCommands {
     if ($beta -ne $true) {
         $commands = $commands | Where-Object { $_.BaseName -notmatch "^beta\." }
     }
+
+    # Filter out metadata files (used to provide help for executables)
+    $commands = $commands | Where-Object { $_.BaseName -notmatch "^metadata\." }
 
     return $commands
 }

@@ -167,10 +167,12 @@ function global:$AliasName {
     Set-PowerStubConfigurationKey 'DirectAliases' $directAliases
 
     # Return info object
+    $stubConfig = $stubs[$Stub]
+    $stubPath = Get-PowerStubPath -StubConfig $stubConfig
     [PSCustomObject]@{
         AliasName = $AliasName
         Stub      = $Stub
-        StubPath  = $stubs[$Stub]
+        StubPath  = $stubPath
         Usage     = @"
 Alias '$AliasName' created for stub '$Stub'.
 
