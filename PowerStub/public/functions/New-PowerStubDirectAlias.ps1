@@ -136,10 +136,14 @@ function global:$AliasName {
     Invoke-Expression $functionBody
 
     # Register ArgumentCompleter for -Command parameter
+    # Note: Must call Find-PowerStubCommands through the module since it's a private function
     $commandCompleter = {
         param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
 
-        $commands = @(Find-PowerStubCommands $Stub)
+        $module = Get-Module PowerStub
+        if (-not $module) { return @() }
+
+        $commands = @(& $module { param($s) Find-PowerStubCommands $s } $Stub)
         if (-not $commands) { return @() }
 
         $commandNames = @($commands | ForEach-Object {
