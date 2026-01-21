@@ -47,7 +47,19 @@ function Get-PowerStubCommandDynamicParams {
 
     Write-Debug "param count: $($commandObj.Parameters.Count)"
 
+    # Common parameters to exclude (already provided by [CmdletBinding()])
+    $commonParams = @(
+        'Verbose', 'Debug', 'ErrorAction', 'WarningAction', 'InformationAction',
+        'ErrorVariable', 'WarningVariable', 'InformationVariable', 'OutVariable',
+        'OutBuffer', 'PipelineVariable', 'ProgressAction'
+    )
+
     foreach ($paramKey in $commandObj.Parameters.Keys) {
+        # Skip common parameters - they're already defined by [CmdletBinding()]
+        if ($paramKey -in $commonParams) {
+            Write-Debug "Skipping common parameter '$paramKey'"
+            continue
+        }
         $param = $commandObj.Parameters[$paramKey]
         $isMandatory = $param.Attributes | Where-Object { $_.TypeNameOfValue -eq 'System.Management.Automation.ParameterAttribute' } | ForEach-Object { $_.Mandatory }
         $name = $param.Name
