@@ -15,8 +15,11 @@ $publicFn = Get-ChildItem -Path $PSScriptRoot\Public\functions\*.ps1;
 
 #If we are in PowerShell core, load any core specific functions
 if ($IsCoreCLR) {
-    Write-Verbose 'PowerShell 7 specific commands enabled'
-    $publicFn += Get-ChildItem -Path $PSScriptRoot\Public\functions-pscore\*.ps1;
+    $pscorePath = Join-Path $PSScriptRoot 'Public\functions-pscore'
+    if (Test-Path $pscorePath) {
+        Write-Verbose 'PowerShell 7 specific commands enabled'
+        $publicFn += Get-ChildItem -Path "$pscorePath\*.ps1"
+    }
 }
 
 # Load all functions using 'dot' import
