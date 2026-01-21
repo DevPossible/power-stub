@@ -87,6 +87,38 @@ Import-Module ./power-stub/PowerStub/PowerStub.psm1
 Add-Content $PROFILE "`nImport-Module 'C:\path\to\power-stub\PowerStub\PowerStub.psm1'"
 ```
 
+### Making PowerStub Available in Every Session
+
+After installing the module, you need to add it to your PowerShell profile so it loads automatically. If you haven't already done so during installation:
+
+```powershell
+# Add PowerStub to your profile (PSGallery install)
+Add-Content -Path $PROFILE -Value "`nImport-Module PowerStub"
+
+# Or for a custom path (GitHub/Source install)
+Add-Content -Path $PROFILE -Value "`nImport-Module 'C:\path\to\PowerStub\PowerStub.psd1'"
+```
+
+Then reload your profile to apply the changes without restarting PowerShell:
+
+```powershell
+. $PROFILE
+```
+
+Verify the module is loaded and the `pstb` alias is available:
+
+```powershell
+pstb
+```
+
+You should see the PowerStub overview with any registered stubs and built-in commands.
+
+> **Note:** If `$PROFILE` doesn't exist yet, create it first with:
+>
+> ```powershell
+> New-Item -Path $PROFILE -ItemType File -Force
+> ```
+
 ## Quick Start
 
 ### 1. Create a New Stub
