@@ -19,6 +19,10 @@ PowerStub/                        # Repository root
 │   ├── PowerStub.psm1            # Module loader (dot-sources all functions)
 │   ├── PowerStub.psd1            # Module manifest (version 2.0)
 │   └── PowerStub.json            # Runtime configuration
+├── pipelines/                    # Azure DevOps Pipelines
+│   └── release.yml               # Build, test, publish, release pipeline
+├── scripts/                      # Build and deployment scripts
+│   └── get-version.ps1           # Calculates version from conventional commits
 ├── tests/                        # Pester test files (at repo root, 97 tests)
 ├── .claude/commands/             # Claude Code slash commands
 ├── README.md                     # User documentation
@@ -206,12 +210,102 @@ Import-Module ./PowerStub/PowerStub.psm1 -Force
 # Run Pester tests
 Invoke-Pester ./tests/
 
+# Or use the dev script
+./dev-test.ps1
+
 # View current configuration
 Get-PowerStubConfiguration
 
 # Reset configuration to defaults
 Import-PowerStubConfiguration -Reset
 ```
+
+## CI/CD
+
+**Primary:** Azure DevOps Pipelines (source of truth)
+**Mirror:** GitHub (public mirror at DevPossible/power-stub)
+
+| Pipeline | Trigger | Purpose |
+|----------|---------|---------|
+| `pipelines/release.yml` | Push to main | Build, test, mirror to GitHub, publish to PSGallery, create GitHub release |
+
+### Pipeline Stages (in order)
+
+1. **ValidateGitHub** - Verify GitHub PAT has access to the mirror repo
+2. **BuildTest** - Run Pester tests on Windows
+3. **Version** - Calculate next version from conventional commits
+4. **Mirror** - Push code and tags to GitHub
+5. **Publish** - Publish module to PowerShell Gallery
+6. **Release** - Create GitHub release with changelog
+
+### Required Secrets
+
+Variable group: `kv-devpossible-secrets`
+
+| Variable | Purpose |
+|----------|---------|
+| `github-pat` | GitHub PAT for mirroring and releases |
+| `psgallery-api-key` | PowerShell Gallery API key |
+
+### Creating a Release
+
+Releases are automatic on push to main. Version is calculated from commits:
+- `feat:` commits bump MINOR version
+- `fix:` commits bump PATCH version
+- `!` or `BREAKING CHANGE:` bumps MAJOR version
+
+## Conventional Commits
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automated versioning and changelog generation.
+
+### Commit Format
+
+```
+<type>(<scope>): <subject>
+
+[optional body]
+
+[optional footer]
+```
+
+### Types
+
+| Type | Use For | Version Bump |
+|------|---------|--------------|
+| `feat` | New feature | MINOR |
+| `fix` | Bug fix | PATCH |
+| `docs` | Documentation | PATCH |
+| `style` | Formatting (no code change) | PATCH |
+| `refactor` | Code change (no feature/fix) | PATCH |
+| `perf` | Performance | PATCH |
+| `test` | Tests | PATCH |
+| `build` | Build/dependencies | PATCH |
+| `ci` | CI/CD config | PATCH |
+| `chore` | Maintenance | PATCH |
+
+### Breaking Changes
+
+Add `!` after the type or include `BREAKING CHANGE:` in footer:
+
+```
+feat!: remove deprecated API endpoint
+
+BREAKING CHANGE: The /v1/users endpoint has been removed
+```
+
+### Examples
+
+```
+feat(alias): add support for multiple aliases per stub
+fix(config): prevent null reference when config file missing
+docs: update README with new installation steps
+refactor(commands): simplify command discovery logic
+ci: add PSGallery publish stage to pipeline
+```
+
+### Scopes (optional)
+
+Common scopes for this project: `config`, `commands`, `alias`, `completion`, `git`
 
 ## Common Development Tasks
 

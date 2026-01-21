@@ -362,3 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /PowerStub/PowerStub.json
+.mcp-debug-tools/config.json
+
+# Test results
+TestResults/

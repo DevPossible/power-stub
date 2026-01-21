@@ -1,0 +1,385 @@
+# Release Pipeline for PowerStub
+# Triggers on push to main branch
+# Builds, tests, mirrors to GitHub, publishes to PSGallery, creates GitHub release
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '*.md'
+      - 'docs/**'
+
+pr: none
+
+variables:
+  - group: kv-devpossible-secrets
+  - name: modulePath
+    value: '$(Build.SourcesDirectory)/PowerStub'
+  - name: testResultsPath
+    value: '$(Build.SourcesDirectory)/TestResults'
+  - name: githubRepo
+    value: 'DevPossible/power-stub'
+
+stages:
+  # Stage 1: Validate GitHub access
+  - stage: ValidateGitHub
+    displayName: Validate GitHub Access
+    jobs:
+      - job: ValidateGitHubAccess
+        displayName: Test GitHub PAT
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: none
+          - bash: |
+              set -e
+
+              if [ -z "$GITHUB_PAT" ]; then
+                echo "##[error]GITHUB_PAT is not set!"
+                echo "##[error]Add GITHUB_PAT (github-pat) to the kv-devpossible-secrets variable group."
+                exit 1
+              fi
+
+              echo "GITHUB_PAT is set (length: ${#GITHUB_PAT} chars)"
+
+              # Test GitHub API access
+              echo "Testing GitHub API access..."
+              RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "Authorization: token $GITHUB_PAT" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/$(githubRepo)")
+
+              if [ "$RESPONSE" = "200" ]; then
+                echo "##[section]GitHub API access OK (HTTP $RESPONSE)"
+              else
+                echo "##[error]GitHub API access failed (HTTP $RESPONSE)"
+                echo "##[error]Check that GITHUB_PAT has 'repo' scope and is not expired."
+                exit 1
+              fi
+
+              echo "##[section]GitHub access validation PASSED"
+            displayName: Validate GitHub PAT
+            env:
+              GITHUB_PAT: $(github-pat)
+
+  # Stage 2: Build and Test
+  - stage: BuildTest
+    displayName: Build & Test
+    dependsOn: ValidateGitHub
+    jobs:
+      - job: Test
+        displayName: Run Pester Tests
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: PowerShell@2
+            displayName: Install Pester
+            inputs:
+              targetType: inline
+              script: |
+                Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+                Install-Module -Name Pester -MinimumVersion 5.0 -Force -SkipPublisherCheck
+              pwsh: true
+
+          - task: PowerShell@2
+            displayName: Validate Module Manifest
+            inputs:
+              targetType: inline
+              script: |
+                $manifest = Test-ModuleManifest -Path '$(modulePath)/PowerStub.psd1' -Verbose
+                Write-Host "Module: $($manifest.Name)"
+                Write-Host "Version: $($manifest.Version)"
+                Write-Host "Author: $($manifest.Author)"
+              pwsh: true
+
+          - task: PowerShell@2
+            displayName: Run Pester Tests
+            inputs:
+              targetType: inline
+              script: |
+                $ErrorActionPreference = 'Stop'
+
+                # Create test results directory
+                New-Item -Path '$(testResultsPath)' -ItemType Directory -Force | Out-Null
+
+                # Configure Pester
+                $config = New-PesterConfiguration
+                $config.Run.Path = '$(Build.SourcesDirectory)/tests'
+                $config.Run.Exit = $true
+                $config.Output.Verbosity = 'Detailed'
+                $config.TestResult.Enabled = $true
+                $config.TestResult.OutputPath = '$(testResultsPath)/testResults.xml'
+                $config.TestResult.OutputFormat = 'NUnitXml'
+
+                # Import module for testing
+                Import-Module '$(modulePath)/PowerStub.psm1' -Force
+
+                # Run tests
+                Invoke-Pester -Configuration $config
+              pwsh: true
+
+          - task: PublishTestResults@2
+            displayName: Publish Test Results
+            condition: always()
+            inputs:
+              testResultsFormat: NUnit
+              testResultsFiles: '$(testResultsPath)/testResults.xml'
+              failTaskOnFailedTests: true
+
+  # Stage 3: Calculate Version
+  - stage: Version
+    displayName: Calculate Version
+    dependsOn: BuildTest
+    jobs:
+      - job: CalculateVersion
+        displayName: Determine Release Version
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: PowerShell@2
+            displayName: Calculate version from commits
+            name: versionStep
+            inputs:
+              targetType: inline
+              script: |
+                $ErrorActionPreference = 'Stop'
+
+                # Check if HEAD already has a tag
+                $existingTag = git tag --points-at HEAD 2>$null | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
+
+                if ($existingTag) {
+                    $version = $existingTag -replace '^v', ''
+                    Write-Host "Found existing tag: $existingTag"
+                    Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                    Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]true"
+                    Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
+                    return
+                }
+
+                Write-Host "No existing tag on HEAD, calculating version from commits..."
+                Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]false"
+
+                # Run version calculation script
+                $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1'
+                Write-Host "Calculated version: $version"
+
+                # Check if this version tag already exists
+                $tagCheck = git rev-parse "v$version" 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "Tag v$version already exists, bumping patch..."
+                    $parts = $version -split '\.'
+                    $major = [int]$parts[0]
+                    $minor = [int]$parts[1]
+                    $patch = [int]$parts[2]
+
+                    do {
+                        $patch++
+                        $checkTag = git rev-parse "v$major.$minor.$patch" 2>$null
+                    } while ($LASTEXITCODE -eq 0)
+
+                    $version = "$major.$minor.$patch"
+                    Write-Host "Next available version: $version"
+                }
+
+                Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
+                Write-Host "Version: $version"
+              pwsh: true
+
+          - task: PowerShell@2
+            displayName: Generate changelog
+            inputs:
+              targetType: inline
+              script: |
+                $ErrorActionPreference = 'Stop'
+                $version = '$(versionStep.version)'
+                $lastTag = git describe --tags --abbrev=0 'HEAD^' 2>$null
+                if (-not $lastTag) {
+                    $lastTag = git describe --tags --abbrev=0 2>$null
+                }
+
+                Write-Host "Last tag: $($lastTag ?? '(none)')"
+
+                if ($lastTag) {
+                    $commits = git log "$lastTag..HEAD" --pretty=format:"- %s" --reverse
+                    $compareUrl = "https://github.com/$(githubRepo)/compare/${lastTag}...v${version}"
+                } else {
+                    $commits = git log --pretty=format:"- %s" --reverse | Select-Object -First 50
+                    $compareUrl = "https://github.com/$(githubRepo)/commits/v${version}"
+                }
+
+                $changelog = @"
+                ## What's Changed
+
+                $($commits -join "`n")
+
+                **Full Changelog**: $compareUrl
+                "@
+
+                $changelogPath = '$(Build.ArtifactStagingDirectory)/changelog.md'
+                $changelog | Out-File -FilePath $changelogPath -Encoding utf8
+
+                Write-Host "Generated changelog:"
+                Get-Content $changelogPath
+              pwsh: true
+
+          - publish: $(Build.ArtifactStagingDirectory)/changelog.md
+            artifact: changelog
+            displayName: Publish changelog
+
+  # Stage 4: Mirror to GitHub
+  - stage: Mirror
+    displayName: Mirror to GitHub
+    dependsOn: Version
+    variables:
+      version: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.version'] ]
+      tagExists: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.tagExists'] ]
+    jobs:
+      - job: MirrorRepo
+        displayName: Push to GitHub
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - bash: |
+              git config user.email "azure-pipelines@devpossible.com"
+              git config user.name "Azure Pipelines"
+            displayName: Configure Git
+
+          - bash: |
+              set -e
+
+              echo "Creating tag v$(version) if it doesn't exist..."
+              if [ "$(tagExists)" != "true" ]; then
+                git tag -a "v$(version)" -m "Release v$(version)"
+                git push origin "v$(version)"
+                echo "Tag v$(version) created and pushed to origin"
+              else
+                echo "Tag already exists, skipping tag creation"
+              fi
+            displayName: Create git tag
+            condition: ne(variables['tagExists'], 'true')
+
+          - bash: |
+              set -e
+
+              echo "Pushing to GitHub mirror..."
+
+              # Configure GitHub remote with PAT authentication
+              GITHUB_URL="https://x-access-token:${GITHUB_PAT}@github.com/$(githubRepo).git"
+              git remote add github "$GITHUB_URL" 2>/dev/null || git remote set-url github "$GITHUB_URL"
+
+              # Push the current branch to GitHub
+              echo "Pushing branch $(Build.SourceBranchName) to GitHub..."
+              git push github HEAD:$(Build.SourceBranchName) --force
+
+              # Push the tag to GitHub
+              echo "Pushing tag v$(version) to GitHub..."
+              git push github "v$(version)" --force
+
+              echo "GitHub mirror sync complete"
+            displayName: Push to GitHub
+            env:
+              GITHUB_PAT: $(github-pat)
+
+  # Stage 5: Publish to PSGallery
+  - stage: Publish
+    displayName: Publish to PSGallery
+    dependsOn:
+      - Version
+      - Mirror
+    variables:
+      version: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.version'] ]
+    jobs:
+      - job: PublishModule
+        displayName: Publish Module
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+          - checkout: self
+
+          - task: PowerShell@2
+            displayName: Update Module Version
+            inputs:
+              targetType: inline
+              script: |
+                $manifestPath = '$(modulePath)/PowerStub.psd1'
+                $version = '$(version)'
+
+                Write-Host "Updating manifest version to: $version"
+                Update-ModuleManifest -Path $manifestPath -ModuleVersion $version
+
+                # Verify update
+                $manifest = Test-ModuleManifest -Path $manifestPath
+                Write-Host "Updated version: $($manifest.Version)"
+              pwsh: true
+
+          - task: PowerShell@2
+            displayName: Publish to PowerShell Gallery
+            inputs:
+              targetType: inline
+              script: |
+                $ErrorActionPreference = 'Stop'
+
+                $apiKey = '$(psgallery-api-key)'
+                if ([string]::IsNullOrWhiteSpace($apiKey)) {
+                    throw "psgallery-api-key variable is not set. Add it to the kv-devpossible-secrets variable group."
+                }
+
+                Write-Host "Publishing PowerStub module to PowerShell Gallery..."
+                Write-Host "Module path: $(modulePath)"
+                Write-Host "Version: $(version)"
+
+                # Publish the module
+                Publish-Module -Path '$(modulePath)' -NuGetApiKey $apiKey -Verbose
+
+                Write-Host "Successfully published PowerStub v$(version) to PowerShell Gallery!"
+              pwsh: true
+
+  # Stage 6: Create GitHub Release
+  - stage: Release
+    displayName: Create GitHub Release
+    dependsOn:
+      - Version
+      - Mirror
+      - Publish
+    variables:
+      version: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.version'] ]
+    jobs:
+      - job: CreateGitHubRelease
+        displayName: Create GitHub Release
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - download: current
+            artifact: changelog
+            displayName: Download changelog
+
+          - task: GitHubRelease@1
+            displayName: Create GitHub Release
+            inputs:
+              gitHubConnection: 'github.com_DevPossible'
+              repositoryName: '$(githubRepo)'
+              action: create
+              target: '$(Build.SourceVersion)'
+              tagSource: userSpecifiedTag
+              tag: 'v$(version)'
+              title: 'PowerStub v$(version)'
+              releaseNotesFilePath: '$(Pipeline.Workspace)/changelog/changelog.md'
+              isDraft: false
+              isPreRelease: false
+              addChangeLog: false
