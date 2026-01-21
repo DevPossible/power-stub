@@ -192,6 +192,7 @@ stages:
                 Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                 Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                 Write-Host "Version: $version"
+                exit 0
               pwsh: true
 
           - task: PowerShell@2
