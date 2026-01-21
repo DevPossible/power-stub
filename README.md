@@ -1,5 +1,9 @@
 # PowerStub
 
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/PowerStub?label=PSGallery&color=blue)](https://www.powershellgallery.com/packages/PowerStub)
+[![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/PowerStub?label=Downloads&color=green)](https://www.powershellgallery.com/packages/PowerStub)
+[![GitHub](https://img.shields.io/github/license/DevPossible/power-stub)](https://github.com/DevPossible/power-stub/blob/main/LICENSE.txt)
+
 A PowerShell module for organizing scripts, executables, and CLI tools using command proxies. Stop cluttering your PATH - organize your tools into logical namespaces and access them through a single entry point.
 
 ## The Problem
@@ -37,15 +41,50 @@ pstb DevOps deploy-app -Environment prod
 
 ## Installation
 
+### Option 1: From PowerShell Gallery (Recommended)
+
+The easiest way to install PowerStub:
+
 ```powershell
-# Clone the repository
-git clone https://github.com/DevPossible/PowerStub.git
+# Install from PowerShell Gallery
+Install-Module -Name PowerStub -Scope CurrentUser
 
 # Import the module
-Import-Module ./PowerStub/PowerStub/PowerStub.psm1
+Import-Module PowerStub
 
 # Add to your PowerShell profile for persistent use
-Add-Content $PROFILE "`nImport-Module 'C:\path\to\PowerStub\PowerStub\PowerStub.psm1'"
+Add-Content $PROFILE "`nImport-Module PowerStub"
+```
+
+### Option 2: From GitHub Release
+
+Download a specific release from [GitHub Releases](https://github.com/DevPossible/power-stub/releases):
+
+1. Download the latest release `.zip` file
+2. Extract to a folder (e.g., `C:\Modules\PowerStub`)
+3. Import the module:
+
+```powershell
+# Import from extracted location
+Import-Module C:\Modules\PowerStub\PowerStub.psd1
+
+# Add to your PowerShell profile for persistent use
+Add-Content $PROFILE "`nImport-Module 'C:\Modules\PowerStub\PowerStub.psd1'"
+```
+
+### Option 3: From Source (Development)
+
+Clone the repository for development or to get the latest changes:
+
+```powershell
+# Clone the repository
+git clone https://github.com/DevPossible/power-stub.git
+
+# Import the module from source
+Import-Module ./power-stub/PowerStub/PowerStub.psm1
+
+# Add to your PowerShell profile for persistent use
+Add-Content $PROFILE "`nImport-Module 'C:\path\to\power-stub\PowerStub\PowerStub.psm1'"
 ```
 
 ## Quick Start
@@ -399,8 +438,8 @@ Install-Module Pester -Force -SkipPublisherCheck
 #### 1. Clone and Set Up
 
 ```powershell
-git clone https://github.com/DevPossible/PowerStub.git
-cd PowerStub
+git clone https://github.com/DevPossible/power-stub.git
+cd power-stub
 ```
 
 #### 2. Load the Module for Testing
