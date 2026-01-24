@@ -1359,4 +1359,44 @@ Describe "Argument Passing - Mixed Scenarios" {
             $result.Args[1].Value | Should -Be "pods"
         }
     }
+
+    Context "Zero-Argument Invocation" {
+        # These tests verify that commands can be invoked without arguments
+        # and that no spurious arguments (like --%  ) are passed to the target command.
+        # Regression tests for: https://github.com/DevPossible/power-stub/issues/XX
+
+        It "Should invoke command with no arguments successfully" {
+            # The no-args command will report UNEXPECTED_ARG if any args are passed
+            $output = pstb SampleStub no-args
+            $output | Should -Contain "NO_ARGS_SUCCESS"
+        }
+
+        It "Should not pass --% token when no arguments provided" {
+            # This specifically tests the regression where --% was passed as an argument
+            $output = pstb SampleStub no-args
+            $output | Should -Not -Contain "--%" -Because "the stop-parsing token should not be passed as an argument"
+            $output | Should -Not -Match "UNEXPECTED_ARG" -Because "no arguments should be passed"
+        }
+
+        It "Should report zero arguments with arg-echo when called without args" {
+            $output = pstb SampleStub arg-echo
+            $result = Get-ArgEchoResult $output
+
+            $result.ArgCount | Should -Be 0 -Because "no arguments were passed"
+            $result.Args.Count | Should -Be 0
+        }
+
+        It "Should still work with arguments after zero-arg invocation" {
+            # First call with no args
+            $noArgOutput = pstb SampleStub no-args
+            $noArgOutput | Should -Contain "NO_ARGS_SUCCESS"
+
+            # Then call with args - verify it still works
+            $withArgOutput = pstb SampleStub arg-echo "test"
+            $result = Get-ArgEchoResult $withArgOutput
+
+            $result.ArgCount | Should -Be 1
+            $result.Args[0].Value | Should -Be "test"
+        }
+    }
 }

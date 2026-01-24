@@ -36,10 +36,15 @@ function Invoke-CheckedCommandWithParams {
             #just use the command line as provided
             $exp = "& $command $($exeParsing)$cmdArguments" #do not add a space between the exeParsing variable and the arguments variable
         }
-        else {
+        elseif ($psParams -and $psParams.Count -gt 0) {
             #use the parameters as provided by converting the array to a string
-            $exp = "& $command --% "
+            #only use --% for .exe files to handle special characters
+            $exp = "& $command $exeParsing"
             $exp += $psParams -join " "
+        }
+        else {
+            #no arguments to pass - just invoke the command directly
+            $exp = "& $command"
         }
 
         Write-Debug -Message "Expression String: $exp"
