@@ -107,6 +107,15 @@ else {
 $installPath = Join-Path $modulesPath $moduleName
 Write-Info "Installation path: $installPath"
 
+# Backup existing config before any removal
+$configFile = Join-Path $installPath "PowerStub.json"
+$configBackup = $null
+if (Test-Path $configFile) {
+    Write-Step "Backing up existing configuration..."
+    $configBackup = Get-Content $configFile -Raw
+    Write-Success "Configuration backed up (will be preserved)"
+}
+
 # Check for existing installation
 if (Test-Path $installPath) {
     Write-Warn "Existing installation found"
@@ -155,6 +164,13 @@ foreach ($item in $items) {
     }
 }
 Write-Success "Copied $fileCount files"
+
+# Restore config if we had a backup
+if ($configBackup) {
+    Write-Step "Restoring configuration..."
+    Set-Content -Path $configFile -Value $configBackup -NoNewline
+    Write-Success "Configuration restored (your stubs are preserved)"
+}
 
 # Import the new module
 Write-Step "Loading installed module..."
