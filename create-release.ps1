@@ -8,12 +8,10 @@
     2. Pulls latest changes from develop
     3. Switches to main and pulls latest
     4. Merges develop into main (fast-forward when possible)
-    5. Runs tests to verify the merge
-    6. Pushes main to all configured remotes
-    7. Returns to the develop branch
+    5. Pushes main to all configured remotes
+    6. Returns to the develop branch
 
-.PARAMETER SkipTests
-    Skip running tests after the merge (not recommended).
+    Tests are run by the CI/CD pipeline after push.
 
 .PARAMETER DryRun
     Show what would happen without actually doing it.
@@ -23,19 +21,18 @@
 
 .EXAMPLE
     .\create-release.ps1
-    # Interactive release with confirmation and tests
+    # Interactive release with confirmation
 
 .EXAMPLE
     .\create-release.ps1 -DryRun
     # Show what would happen without making changes
 
 .EXAMPLE
-    .\create-release.ps1 -Force -SkipTests
-    # Non-interactive release without tests (use with caution)
+    .\create-release.ps1 -Force
+    # Non-interactive release
 #>
 [CmdletBinding()]
 param(
-    [switch]$SkipTests,
     [switch]$DryRun,
     [switch]$Force
 )
@@ -182,33 +179,6 @@ else {
     Write-Info "[DryRun] Would merge develop into main"
 }
 Write-Success "Merge completed"
-
-# Run tests
-if (-not $SkipTests) {
-    Write-Step "Running tests to verify merge..."
-    if (-not $DryRun) {
-        $testScript = Join-Path $PSScriptRoot "dev-test.ps1"
-        if (Test-Path $testScript) {
-            & $testScript -Output Normal
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "`nTests failed! Rolling back merge..." -ForegroundColor Red
-                git reset --hard HEAD~1
-                git checkout develop
-                throw "Tests failed after merge. Merge has been rolled back."
-            }
-            Write-Success "All tests passed"
-        }
-        else {
-            Write-Warn "Test script not found, skipping tests"
-        }
-    }
-    else {
-        Write-Info "[DryRun] Would run tests"
-    }
-}
-else {
-    Write-Warn "Skipping tests (not recommended)"
-}
 
 # Push to all remotes
 Write-Step "Pushing main to all remotes..."
