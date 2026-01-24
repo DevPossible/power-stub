@@ -148,9 +148,18 @@ function Invoke-PowerStubCommand {
             return
         }
 
+        # Check if stub is registered first
+        $stubs = Get-PowerStubConfigurationKey 'Stubs'
+        if (-not $stubs -or -not $stubs.ContainsKey($stub)) {
+            $registeredStubs = if ($stubs) { ($stubs.Keys -join ', ') } else { '(none)' }
+            Throw "Stub '$stub' is not registered. Registered stubs: $registeredStubs`n`nTo register: New-PowerStub -Name '$stub' -Path '<path-to-stub-folder>'"
+        }
+
         $commandObj = Get-PowerStubCommand $stub $command
         if (!$commandObj) {
-            Throw "Command '$stub : $command' not found!"
+            $stubConfig = $stubs[$stub]
+            $stubPath = Get-PowerStubPath -StubConfig $stubConfig
+            Throw "Command '$command' not found in stub '$stub'.`n`nStub path: $stubPath`nExpected: $stubPath\Commands\$command.ps1 or $stubPath\Commands\$command\$command.ps1"
         }
 
         $line = $myinvocation.line
