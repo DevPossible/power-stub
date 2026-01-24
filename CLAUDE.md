@@ -254,6 +254,14 @@ Releases are automatic on push to main. Version is calculated from commits:
 - `fix:` commits bump PATCH version
 - `!` or `BREAKING CHANGE:` bumps MAJOR version
 
+### Claude Code Rules
+
+**Do NOT push to main.** The user handles all releases manually using `create-release.ps1`. Claude should:
+
+1. Make commits on the current branch (usually `develop`)
+2. Never run `git push origin main` or `create-release.ps1`
+3. Let the user decide when to trigger a release
+
 ## Conventional Commits
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automated versioning and changelog generation.
