@@ -850,7 +850,11 @@ Describe "Remove-PowerStubDirectAlias" {
 
     Context "Parameter Validation" {
         It "Should require -AliasName parameter" {
-            { Remove-PowerStubDirectAlias } | Should -Throw
+            # Test that AliasName is marked as Mandatory (can't test invocation without it as it prompts)
+            $cmd = Get-Command Remove-PowerStubDirectAlias
+            $param = $cmd.Parameters['AliasName']
+            $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                ForEach-Object { $_.Mandatory } | Should -Contain $true
         }
 
         It "Should throw when alias doesn't exist in config" {
@@ -1026,15 +1030,27 @@ Write-Output "Test command executed with: $Name"
 
     Context "Parameter Validation" {
         It "Should require -Stub parameter" {
-            { Set-PowerStubCommandVisibility -Command "test" -Visibility Alpha } | Should -Throw
+            # Test that Stub is marked as Mandatory (can't test invocation without it as it prompts)
+            $cmd = Get-Command Set-PowerStubCommandVisibility
+            $param = $cmd.Parameters['Stub']
+            $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                ForEach-Object { $_.Mandatory } | Should -Contain $true
         }
 
         It "Should require -Command parameter" {
-            { Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Visibility Alpha } | Should -Throw
+            # Test that Command is marked as Mandatory (can't test invocation without it as it prompts)
+            $cmd = Get-Command Set-PowerStubCommandVisibility
+            $param = $cmd.Parameters['Command']
+            $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                ForEach-Object { $_.Mandatory } | Should -Contain $true
         }
 
         It "Should require -Visibility parameter" {
-            { Set-PowerStubCommandVisibility -Stub "VisibilityStub" -Command "test" } | Should -Throw
+            # Test that Visibility is marked as Mandatory (can't test invocation without it as it prompts)
+            $cmd = Get-Command Set-PowerStubCommandVisibility
+            $param = $cmd.Parameters['Visibility']
+            $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                ForEach-Object { $_.Mandatory } | Should -Contain $true
         }
 
         It "Should throw for non-existent stub" {
