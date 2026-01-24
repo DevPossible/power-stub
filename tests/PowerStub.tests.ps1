@@ -706,11 +706,19 @@ Describe "New-PowerStubDirectAlias" {
 
     Context "Parameter Validation" {
         It "Should require -AliasName parameter" {
-            { New-PowerStubDirectAlias -Stub "SampleStub" } | Should -Throw
+            # Test that AliasName is marked as Mandatory (can't test invocation without it as it prompts)
+            $cmd = Get-Command New-PowerStubDirectAlias
+            $param = $cmd.Parameters['AliasName']
+            $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                ForEach-Object { $_.Mandatory } | Should -Contain $true
         }
 
         It "Should require -Stub parameter" {
-            { New-PowerStubDirectAlias -AliasName "ts" } | Should -Throw
+            # Test that Stub is marked as Mandatory (can't test invocation without it as it prompts)
+            $cmd = Get-Command New-PowerStubDirectAlias
+            $param = $cmd.Parameters['Stub']
+            $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                ForEach-Object { $_.Mandatory } | Should -Contain $true
         }
 
         It "Should throw when stub doesn't exist" {
