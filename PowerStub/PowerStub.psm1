@@ -188,30 +188,7 @@ if ($directAliases) {
     }
 }
 
-# Check Git status for stubs with configured repos
-if ($Script:GitEnabled) {
-    Write-Verbose "Checking Git status for stubs"
-    $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    # Copy keys to array to avoid "Collection was modified" error during enumeration
-    $stubNames = @($stubs.Keys)
-    foreach ($stubName in $stubNames) {
-        $stubConfig = $stubs[$stubName]
-        # Check if stub config is a hashtable with GitRepoUrl
-        if ($stubConfig -is [hashtable] -and $stubConfig.GitRepoUrl) {
-            $stubPath = $stubConfig.Path
-            $gitInfo = Get-PowerStubGitInfo -Path $stubPath
-            if ($gitInfo.IsRepo -and $gitInfo.BehindCount -gt 0) {
-                Write-Host "Stub '$stubName' is $($gitInfo.BehindCount) commit(s) behind the remote repo. Run 'pstb update $stubName' to update." -ForegroundColor Yellow
-            }
-        }
-        # Also check if it's just a path string and in a git repo
-        elseif ($stubConfig -is [string]) {
-            $gitInfo = Get-PowerStubGitInfo -Path $stubConfig
-            if ($gitInfo.IsRepo -and $gitInfo.RemoteUrl -and $gitInfo.BehindCount -gt 0) {
-                Write-Host "Stub '$stubName' is $($gitInfo.BehindCount) commit(s) behind the remote repo. Run 'pstb update $stubName' to update." -ForegroundColor Yellow
-            }
-        }
-    }
-}
+# NOTE: Git status checks are NOT performed on module load for performance.
+# Use 'pstb update --check' to check for updates manually.
 
 Write-Verbose "PowerStub module loaded."

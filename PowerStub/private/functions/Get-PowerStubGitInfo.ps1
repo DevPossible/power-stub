@@ -26,7 +26,10 @@ function Get-PowerStubGitInfo {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Path
+        [string]$Path,
+
+        [Parameter()]
+        [switch]$Fetch
     )
 
     # Check if git is available
@@ -77,8 +80,8 @@ function Get-PowerStubGitInfo {
         $currentBranch = git rev-parse --abbrev-ref HEAD 2>$null
 
         # Fetch to update remote tracking info (silently)
-        # Only fetch if we have a remote
-        if ($remoteUrl) {
+        # Only fetch if explicitly requested and we have a remote
+        if ($Fetch -and $remoteUrl) {
             git fetch origin --quiet 2>$null
         }
 
