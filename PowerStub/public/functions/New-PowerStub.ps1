@@ -3,23 +3,39 @@
   Registers a new PowerStub in the specified path.
 
 .DESCRIPTION
-  Registers a new PowerStub in the specified path.
-  
-  A stub provides centralized access to a logical grouping of scripts or other tools.
-  This facilitates proper organization and access to the scripts without requireing each element to be in the system path.
-  
-  Creates the folder and sub-folders, if necessary.
+  Registers a new PowerStub in the specified path. A stub provides centralized access
+  to a logical grouping of scripts or other tools, facilitating proper organization
+  without requiring each element to be added to the system PATH.
 
-.LINK
+  Creates the stub folder and required subfolders (.tests, Commands) if they don't exist.
+  If git is enabled and the path is part of a git repository, the remote URL is automatically saved.
 
-.PARAMETER
+.PARAMETER Name
+  The name of the stub. Must start with a letter and contain only alphanumeric characters,
+  hyphens, and underscores. This is the name used to invoke commands via pstb.
+
+.PARAMETER Path
+  The file system path where the stub's commands and scripts are located.
+  Will be created if it does not exist.
+
+.PARAMETER Force
+  If specified, overwrites an existing stub registration with the same name.
 
 .INPUTS
-None. You cannot pipe objects to this function.
+  None. You cannot pipe objects to this function.
 
 .OUTPUTS
+  None. Updates the configuration with the new stub registration.
 
-.EXAMPLES
+.EXAMPLE
+  New-PowerStub -Name "DevOps" -Path "C:\Scripts\DevOps"
+
+  Registers a new stub named "DevOps" pointing to the DevOps scripts folder.
+
+.EXAMPLE
+  New-PowerStub -Name "Tools" -Path "C:\Tools" -Force
+
+  Registers or overwrites a stub named "Tools", forcing the update if it already exists.
 
 #>
 

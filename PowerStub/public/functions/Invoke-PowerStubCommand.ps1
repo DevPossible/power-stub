@@ -1,19 +1,52 @@
 <#
 .SYNOPSIS
-  Executes a stubbed element.
+  Executes a command from a registered PowerStub.
 
 .DESCRIPTION
+  Invokes a command that is registered within a PowerStub stub. This is the main entry point
+  for executing stubbed commands. It resolves the command path, forwards parameters and arguments,
+  and executes the target script or executable with proper error handling and logging.
 
-.LINK
+  Supports virtual verbs (search, help, update) that perform special operations without
+  mapping to actual command files.
 
-.PARAMETER
+.PARAMETER Stub
+  The name of the stub containing the command. Required unless using virtual verbs.
+  Supports tab completion for registered stubs.
+
+.PARAMETER Command
+  The name of the command to execute within the stub. Required unless showing overview.
+  Supports tab completion for commands in the selected stub.
+  Supports dynamic parameters from the target command.
+
+.PARAMETER RemainingArgs
+  Arguments to pass to the target command. Captured from the command line and passed through unchanged.
 
 .INPUTS
-None. You cannot pipe objects to Invoke-Authenticate.
+  None. You cannot pipe objects to this function.
 
 .OUTPUTS
+  Output from the executed command. This varies depending on the target command.
 
-.EXAMPLES
+.EXAMPLE
+  pstb DevOps deploy -Environment Production
+
+  Executes the deploy command in the DevOps stub with the Environment parameter.
+
+.EXAMPLE
+  pstb search "backup"
+
+  Searches all registered stubs for commands matching "backup".
+
+.EXAMPLE
+  pstb help DevOps deploy
+
+  Displays PowerShell help for the deploy command in the DevOps stub.
+
+.EXAMPLE
+  pstb update --check
+
+  Checks the status of all stub Git repositories without pulling changes.
 
 #>
 
@@ -82,121 +115,7 @@ function Invoke-PowerStubCommand {
                     }
                 }
                 'update' {
-                    # Update git repos for stubs
-                    # Usage: pstb update [stub] [--check]
-                    #   --check: Only show status (fetch from remote) without pulling
-                    if (-not $Script:GitEnabled) {
-                        throw "Git integration is disabled. Enable it with: Set-PowerStubConfigurationKey 'GitEnabled' `$true"
-                    }
-                    if (-not $Script:GitAvailable) {
-                        throw "Git is not available on this system."
-                    }
-
-                    # Parse arguments for --check flag and stub name
-                    $checkOnly = $false
-                    $targetStub = $null
-                    $allArgs = @()
-                    if ($command) { $allArgs += $command }
-                    if ($RemainingArgs) { $allArgs += $RemainingArgs }
-
-                    foreach ($arg in $allArgs) {
-                        if ($arg -eq '--check' -or $arg -eq '-Check') {
-                            $checkOnly = $true
-                        }
-                        elseif (-not $arg.StartsWith('-')) {
-                            $targetStub = $arg
-                        }
-                    }
-
-                    $stubs = Get-PowerStubConfigurationKey 'Stubs'
-                    $processedRepos = @{}
-
-                    if ($targetStub) {
-                        # Process specific stub
-                        if (-not ($stubs.Keys -contains $targetStub)) {
-                            throw "Stub '$targetStub' not found."
-                        }
-                        $stubConfig = $stubs[$targetStub]
-                        $stubPath = Get-PowerStubPath -StubConfig $stubConfig
-                        $gitInfo = Get-PowerStubGitInfo -Path $stubPath -Fetch:$checkOnly
-                        if (-not $gitInfo.IsRepo) {
-                            throw "Stub '$targetStub' is not in a Git repository."
-                        }
-
-                        if ($checkOnly) {
-                            # Show status only
-                            if ($gitInfo.BehindCount -gt 0) {
-                                Write-Host "Stub '$targetStub' is $($gitInfo.BehindCount) commit(s) behind." -ForegroundColor Yellow
-                            }
-                            elseif ($gitInfo.AheadCount -gt 0) {
-                                Write-Host "Stub '$targetStub' is $($gitInfo.AheadCount) commit(s) ahead." -ForegroundColor Cyan
-                            }
-                            else {
-                                Write-Host "Stub '$targetStub' is up to date." -ForegroundColor Green
-                            }
-                        }
-                        else {
-                            # Do actual update
-                            Write-Host "Updating stub '$targetStub'..." -ForegroundColor Cyan
-                            $result = Update-PowerStubGitRepo -Path $stubPath
-                            if ($result.Success) {
-                                Write-Host "  $($result.Message)" -ForegroundColor Green
-                            }
-                            else {
-                                Write-Host "  $($result.Message)" -ForegroundColor Red
-                            }
-                        }
-                    }
-                    else {
-                        # Process all stubs
-                        $behindCount = 0
-                        foreach ($stubName in $stubs.Keys) {
-                            $stubConfig = $stubs[$stubName]
-                            $stubPath = Get-PowerStubPath -StubConfig $stubConfig
-                            $gitInfo = Get-PowerStubGitInfo -Path $stubPath -Fetch:$checkOnly
-                            if ($gitInfo.IsRepo -and $gitInfo.RepoRoot -and -not $processedRepos.ContainsKey($gitInfo.RepoRoot)) {
-                                if ($checkOnly) {
-                                    # Show status only
-                                    if ($gitInfo.BehindCount -gt 0) {
-                                        Write-Host "Stub '$stubName' is $($gitInfo.BehindCount) commit(s) behind." -ForegroundColor Yellow
-                                        $behindCount++
-                                    }
-                                    elseif ($gitInfo.AheadCount -gt 0) {
-                                        Write-Host "Stub '$stubName' is $($gitInfo.AheadCount) commit(s) ahead." -ForegroundColor Cyan
-                                    }
-                                    else {
-                                        Write-Host "Stub '$stubName' is up to date." -ForegroundColor Green
-                                    }
-                                }
-                                else {
-                                    # Do actual update
-                                    Write-Host "Updating stub '$stubName' ($($gitInfo.RepoRoot))..." -ForegroundColor Cyan
-                                    $result = Update-PowerStubGitRepo -Path $stubPath
-                                    if ($result.Success) {
-                                        Write-Host "  $($result.Message)" -ForegroundColor Green
-                                    }
-                                    else {
-                                        Write-Host "  $($result.Message)" -ForegroundColor Red
-                                    }
-                                }
-                                $processedRepos[$gitInfo.RepoRoot] = $true
-                            }
-                        }
-                        if ($processedRepos.Count -eq 0) {
-                            Write-Host "No stubs with Git repositories found." -ForegroundColor Yellow
-                        }
-                        elseif ($checkOnly) {
-                            if ($behindCount -gt 0) {
-                                Write-Host "`n$behindCount stub(s) have updates available. Run 'pstb update' to pull changes." -ForegroundColor Yellow
-                            }
-                            else {
-                                Write-Host "`nAll $($processedRepos.Count) stub(s) are up to date." -ForegroundColor Green
-                            }
-                        }
-                        else {
-                            Write-Host "`nUpdated $($processedRepos.Count) repository(ies)." -ForegroundColor Cyan
-                        }
-                    }
+                    Invoke-PowerStubUpdate -Command $command -RemainingArgs $RemainingArgs
                     return
                 }
             }

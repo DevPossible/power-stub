@@ -1,19 +1,30 @@
 <#
 .SYNOPSIS
-  Imports configuration from the configuration file in the module folder.
+  Imports PowerStub configuration from the configuration file or resets to defaults.
 
 .DESCRIPTION
+  Imports the PowerStub configuration from PowerStub.json in the module configuration directory.
+  Automatically migrates configuration from legacy module version locations if found.
+  Supports resetting the configuration to defaults and re-exporting to the config file.
 
-.LINK
-
-.PARAMETER
+.PARAMETER Reset
+  If specified, resets the configuration to defaults, clears all custom settings, and saves the defaults to the config file.
 
 .INPUTS
-None. You cannot pipe objects to this function.
+  None. You cannot pipe objects to this function.
 
 .OUTPUTS
+  None. Updates the in-memory configuration from the file or defaults.
 
-.EXAMPLES
+.EXAMPLE
+  Import-PowerStubConfiguration
+
+  Loads the configuration from PowerStub.json file.
+
+.EXAMPLE
+  Import-PowerStubConfiguration -Reset
+
+  Resets the configuration to factory defaults and saves to the config file.
 
 #>
 
