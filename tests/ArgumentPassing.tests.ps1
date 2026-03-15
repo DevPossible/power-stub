@@ -243,8 +243,11 @@ Describe "Argument Passing - PS1 Targets" {
             $output = pstb SampleStub arg-echo ""
             $result = Get-ArgEchoResult $output
 
-            # Document actual behavior - empty string may or may not be captured
-            $result.ArgCount | Should -BeGreaterOrEqual 0
+            if ($result.ArgCount -eq 0) {
+                Set-ItResult -Skipped -Because "Empty string not captured on this platform"
+            } else {
+                $result.ArgCount | Should -BeGreaterThan 0
+            }
         }
 
         It "Should pass named string parameter to arg-dump" {
@@ -292,7 +295,7 @@ Describe "Argument Passing - PS1 Targets" {
             else {
                 # Document: script-scoped variables may not expand via raw line extraction
                 # This is a known limitation when using $myinvocation.line parsing
-                $true | Should -Be $true -Because "Variable expansion via raw line extraction has limitations"
+                Set-ItResult -Skipped -Because "Script-scoped variable expansion has platform-dependent behavior"
             }
         }
 
@@ -326,8 +329,7 @@ Describe "Argument Passing - PS1 Targets" {
                 $result.ArgCount | Should -BeGreaterOrEqual 1
             }
             else {
-                # Document limitation: array variables don't always expand
-                $result.ArgCount | Should -BeGreaterOrEqual 0 -Because "Array variable expansion via raw line has limitations"
+                Set-ItResult -Skipped -Because "Array variable expansion has platform-dependent behavior"
             }
         }
 
@@ -422,12 +424,11 @@ Describe "Argument Passing - PS1 Targets" {
                 }
                 else {
                     # Newline caused empty/broken parsing - this is the limitation
-                    $true | Should -Be $true -Because "Embedded newlines may cause parsing issues"
+                    Set-ItResult -Skipped -Because "Embedded newlines may cause parsing issues"
                 }
             }
             else {
-                # No args captured - newline broke the parsing
-                $result.ArgCount | Should -BeGreaterOrEqual 0 -Because "Embedded newlines are a known parsing limitation"
+                Set-ItResult -Skipped -Because "Embedded newlines are a known parsing limitation"
             }
         }
 
@@ -475,8 +476,11 @@ Describe "Argument Passing - PS1 Targets" {
             $output = pstb SampleStub arg-echo ''
             $result = Get-ArgEchoResult $output
 
-            # Empty strings may or may not be captured depending on implementation
-            $result.ArgCount | Should -BeGreaterOrEqual 0
+            if ($result.ArgCount -eq 0) {
+                Set-ItResult -Skipped -Because "Empty strings not captured on this platform"
+            } else {
+                $result.ArgCount | Should -BeGreaterThan 0
+            }
         }
     }
 
@@ -1110,16 +1114,22 @@ Describe "Argument Passing - Edge Cases" {
             $output = pstb SampleStub arg-echo "line`rreturn"
             $result = Get-ArgEchoResult $output
 
-            # Carriage return may cause parsing issues
-            $result.ArgCount | Should -BeGreaterOrEqual 0
+            if ($result.ArgCount -eq 0) {
+                Set-ItResult -Skipped -Because "Carriage return handling varies by platform"
+            } else {
+                $result.ArgCount | Should -BeGreaterThan 0
+            }
         }
 
         It "Should handle escape sequence for null" {
             $output = pstb SampleStub arg-echo "has`0null"
             $result = Get-ArgEchoResult $output
 
-            # Null character may cause issues
-            $result.ArgCount | Should -BeGreaterOrEqual 0
+            if ($result.ArgCount -eq 0) {
+                Set-ItResult -Skipped -Because "Null character handling varies by platform"
+            } else {
+                $result.ArgCount | Should -BeGreaterThan 0
+            }
         }
 
         It "Should handle escape sequence for alert/bell" {

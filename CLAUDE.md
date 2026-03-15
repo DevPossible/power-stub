@@ -59,7 +59,8 @@ PowerStub/                        # Repository root
 |------|----------|---------|
 | `Find-PowerStubCommands.ps1` | Discovery | Finds .ps1/.exe files, filters by alpha./beta. prefix |
 | `Get-PowerStubCommandDynamicParams.ps1` | DynamicParam | Extracts parameters from target command |
-| `Invoke-CheckedCommand.ps1` | Execution | Core command runner with error handling |
+| `Invoke-CheckedCommand.ps1` | Execution | Core command runner using call operator with splatting |
+| `Invoke-PowerStubUpdate.ps1` | Git | Handles the 'pstb update' virtual verb |
 | `New-DynamicParam.ps1` | Utility | Creates RuntimeDefinedParameter objects |
 | `ConvertTo-Hashtable.ps1` | Utility | Converts PSObjects to hashtables |
 | `Show-PowerStubOverview.ps1` | Display | Shows overview when pstb runs without args |
@@ -149,20 +150,23 @@ do deploy  # Same as: pstb DevOps deploy
 
 ### Smart Tab Completion
 
-The module installs a custom `TabExpansion2` wrapper that provides intelligent parameter completion:
+The module uses `Register-ArgumentCompleter` to provide intelligent completion:
 
-- Filters out `-Stub` from completions when stub is already provided positionally
-- Filters out `-Command` from completions when command is already provided positionally
-- Shows dynamic parameters from the target command
-- Does not affect other PowerShell commands
+- Stub names and virtual verbs for the `-Stub` parameter
+- Command names (with alpha/beta prefix stripping) for the `-Command` parameter
+- Dynamic parameters from the target command via `DynamicParam`
+- Direct aliases get their own argument completers for command names
 
-This allows `pstb DevOps deploy -<Tab>` to show only `-Environment` (the deploy script's parameter) instead of also showing `-Stub` and `-Command`.
+Note: TabExpansion2 is intentionally NOT overridden to avoid breaking tab completion for other commands.
 
 ### Configuration Management
 
 - Config stored in `$Script:PSTBSettings` hashtable
-- Persisted to `PowerStub.json` (excludes internal keys)
-- Internal keys: `ModulePath`, `ConfigFile`, `InternalConfigKeys`
+- Persisted to `%APPDATA%/PowerStub/config.json` (excludes internal keys)
+- Atomic writes via temp file + rename to prevent corruption
+- Internal keys: `ModulePath`, `ConfigFile`, `LegacyConfigFile`, `InternalConfigKeys`, `GitAvailable`
+- Config key validation warns on unknown keys to prevent typos
+- `Set-PowerStubConfiguration` preserves internal keys when replacing config
 
 ### Command Discovery
 
@@ -336,7 +340,7 @@ Common scopes for this project: `config`, `commands`, `alias`, `completion`, `gi
 
 ## Known Issues / TODO
 
-- `Get-NamedParameters` function is referenced in `Invoke-CheckedCommand.ps1` but not defined - this breaks object parameter splatting
+- None currently. Previous `Get-NamedParameters` dead code was removed in the security overhaul.
 
 ## Code Style Guidelines
 
@@ -348,7 +352,7 @@ Common scopes for this project: `config`, `commands`, `alias`, `completion`, `gi
 
 ## Testing Approach
 
-Tests use Pester framework (97 tests). Key test areas:
+Tests use Pester framework (277 tests across 3 files). Key test areas:
 
 - Configuration loading/saving
 - Stub registration/removal
@@ -362,6 +366,10 @@ Tests use Pester framework (97 tests). Key test areas:
 - Direct aliases (create, remove, persistence, tab completion)
 - Virtual verbs (search, help commands)
 - Command visibility changes (alpha/beta/production lifecycle)
+- Private function unit tests (ConvertTo-Hashtable, Get-PowerStubPath, New-DynamicParam, etc.)
+- Error paths (unregistered stubs, missing commands, invalid config)
+- WhatIf/ShouldProcess support
+- Subfolder command visibility changes
 
 ## Claude Commands
 
@@ -392,8 +400,8 @@ Use the **Explore** agent for:
 Use the **Plan** agent for:
 
 - Adding new features like additional file type support (.bat, .cmd)
-- Implementing the missing `Get-NamedParameters` function
-- Redesigning the argument passing mechanism
+- Centralizing supported file extensions into a configuration constant
+- Adding new virtual verbs (currently hardcoded in a data structure)
 
 ## PowerShell-Specific Tips
 

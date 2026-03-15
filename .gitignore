@@ -364,6 +364,9 @@ FodyWeavers.xsd
 /PowerStub/PowerStub.json
 .mcp-debug-tools/config.json
 
+# AI agent working files
+.aitemp/
+
 # Test results
 TestResults/
 .claude/settings.local.json
