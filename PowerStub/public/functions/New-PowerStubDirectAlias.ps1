@@ -60,9 +60,11 @@ function New-PowerStubDirectAlias {
         throw "A command named '$AliasName' already exists. Use -Force to overwrite."
     }
 
-    # Create the function in global scope
+    # Create the function in global scope using ScriptBlock instead of Invoke-Expression
+    # Escape single quotes in stub name to prevent code injection
+    $escapedStub = $Stub -replace "'", "''"
+
     $functionBody = @"
-function global:$AliasName {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = `$false, Position = 0)]
@@ -73,7 +75,7 @@ function global:$AliasName {
     )
 
     DynamicParam {
-        `$stubName = '$Stub'
+        `$stubName = '$escapedStub'
         `$commandValue = `$PSBoundParameters['Command']
 
         if (`$commandValue -and (Get-Module PowerStub)) {
@@ -86,7 +88,7 @@ function global:$AliasName {
     }
 
     end {
-        `$stubName = '$Stub'
+        `$stubName = '$escapedStub'
 
         if (-not `$Command) {
             # List commands
@@ -101,39 +103,29 @@ function global:$AliasName {
             throw "Command '`$stubName : `$Command' not found!"
         }
 
-        # Parse arguments from invocation line
-        `$line = `$MyInvocation.Line
-        Write-Debug "line: `$line"
-
-        # Find where the command name ends and arguments begin
-        `$cmdArgs = `$null
-        `$i = `$line.IndexOf(`$Command)
-        if (`$i -ge 0) {
-            `$cmdArgs = `$line.Substring(`$i + `$Command.Length).Trim()
-        }
-
         `$cmd = `$commandObj.Path
         `$module = Get-Module PowerStub
 
-        # Execute the command
-        if (`$cmdArgs) {
-            Write-Host "Invoking `$cmd with arguments: `$cmdArgs"
-            & `$module { param(`$c, `$p, `$a, `$t) Invoke-CheckedCommandWithParams `$c `$p `$a `$t } `$cmd `$null `$cmdArgs `$true
+        # Collect dynamic parameters (bound params that aren't our static or common params)
+        `$forwardParams = @{}
+        `$skipParams = @('Command', 'RemainingArgs')
+        `$commonParamsList = @('Verbose', 'Debug', 'ErrorAction', 'WarningAction', 'InformationAction',
+            'ErrorVariable', 'WarningVariable', 'InformationVariable', 'OutVariable', 'OutBuffer',
+            'PipelineVariable', 'ProgressAction', 'WhatIf', 'Confirm')
+        foreach (`$key in `$PSBoundParameters.Keys) {
+            if (`$key -notin `$skipParams -and `$key -notin `$commonParamsList) {
+                `$forwardParams[`$key] = `$PSBoundParameters[`$key]
+            }
         }
-        elseif (`$RemainingArgs -and `$RemainingArgs.Count -gt 0) {
-            Write-Host "Invoking `$cmd with positional arguments"
-            & `$module { param(`$c, `$p, `$a, `$t) Invoke-CheckedCommandWithParams `$c `$p `$a `$t } `$cmd `$RemainingArgs `$null `$true
-        }
-        else {
-            Write-Host "Invoking `$cmd"
-            & `$module { param(`$c, `$p, `$a, `$t) Invoke-CheckedCommandWithParams `$c `$p `$a `$t } `$cmd `$null `$null `$true
-        }
+
+        Write-Host "Invoking `$cmd"
+        & `$module { param(`$c, `$n, `$p) Invoke-CheckedCommandWithParams -command `$c -namedParams `$n -positionalArgs `$p } `$cmd `$forwardParams `$RemainingArgs
     }
-}
 "@
 
-    # Create the function
-    Invoke-Expression $functionBody
+    # Create the function via ScriptBlock instead of Invoke-Expression
+    $scriptBlock = [scriptblock]::Create($functionBody)
+    Set-Item -Path "function:global:$AliasName" -Value $scriptBlock
 
     # Register ArgumentCompleter for -Command parameter
     # Note: Must call Find-PowerStubCommands through the module since it's a private function

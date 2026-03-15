@@ -53,6 +53,12 @@ Export-ModuleMember -Function $exports
 
 # setup and export the main alias
 $alias = Get-PowerStubConfigurationKey 'InvokeAlias'
+# Validate alias name to prevent shadowing critical system commands
+$reservedNames = @('cd', 'ls', 'dir', 'where', 'git', 'python', 'node', 'npm', 'set', 'del', 'rm', 'cp', 'mv', 'cat', 'echo', 'type', 'cls', 'clear', 'exit', 'push', 'pop')
+if ($alias -notmatch '^[a-zA-Z][a-zA-Z0-9_\-]{0,20}$' -or $reservedNames -contains $alias.ToLower()) {
+    Write-Warning "PowerStub: Invalid or reserved InvokeAlias '$alias'. Falling back to 'pstb'."
+    $alias = 'pstb'
+}
 Write-Verbose "Creating Invoke-PowerStubCommand alias as: $alias"
 New-Alias $alias Invoke-PowerStubCommand
 Export-ModuleMember -Alias $alias

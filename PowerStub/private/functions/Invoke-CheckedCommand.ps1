@@ -1,54 +1,28 @@
 function Invoke-CheckedCommandWithParams {
     param (
         [string] $command,
-        [object[]] $psParams,
-        [string] $cmdArguments
+        [hashtable] $namedParams = @{},
+        [object[]] $positionalArgs = @()
     )
 
-    $Error.clear()
     $global:LASTEXITCODE = 0
     $exitCode = 0
 
-    #$hasObjects = ($psParams | Where-Object {!($_ -is [String])})
-    $hasObjects = $false
-    $stringTypes = "System.String", "String"
-    foreach ($param in $psParams) {
-        $type = $param.GetType().FullName
-        if (!($stringTypes -contains $type)) {
-            $hasObjects = $true
-            break
-        }
-    }
-
-    if ($hasObjects) {
-        $processedParams = Get-NamedParameters $psParams
-        $named = $processedParams.Named
-        $unnamed = $processedParams.Unnamed
-        #run the command
-        & "$command" @unnamed @named
-    }
-    else {
-        #all the parameters are strings, so lets avoid splatting problems by using a more compatible method
-        $exeParsing = ""
-        if ($command -like '*.exe') { $exeParsing = "--% " } #trailing space is important
-
-        if ($cmdArguments) {
-            #just use the command line as provided
-            $exp = "& $command $($exeParsing)$cmdArguments" #do not add a space between the exeParsing variable and the arguments variable
-        }
-        elseif ($psParams -and $psParams.Count -gt 0) {
-            #use the parameters as provided by converting the array to a string
-            #only use --% for .exe files to handle special characters
-            $exp = "& $command $exeParsing"
-            $exp += $psParams -join " "
+    # Use call operator with splatting instead of Invoke-Expression
+    # This avoids command injection via PowerShell metacharacters in arguments
+    if ($namedParams -and $namedParams.Count -gt 0) {
+        if ($positionalArgs -and $positionalArgs.Count -gt 0) {
+            & $command @namedParams @positionalArgs
         }
         else {
-            #no arguments to pass - just invoke the command directly
-            $exp = "& $command"
+            & $command @namedParams
         }
-
-        Write-Debug -Message "Expression String: $exp"
-        Invoke-Expression -Command $exp
+    }
+    elseif ($positionalArgs -and $positionalArgs.Count -gt 0) {
+        & $command @positionalArgs
+    }
+    else {
+        & $command
     }
 
     $success = $?
@@ -60,7 +34,7 @@ function Invoke-CheckedCommandWithParams {
 
     if (!$success -or ($exitCode -ne 0)) {
         Write-Debug $("$command exited with error code " + $exitCode)
-        Write-Debug $("params: " + $($psParams -join " "))
+        Write-Debug $("params: " + $($positionalArgs -join " "))
         # Extract just the command name for cleaner error message
         $cmdName = Split-Path -Leaf $command
         # Use Write-Host for clean output without stack trace

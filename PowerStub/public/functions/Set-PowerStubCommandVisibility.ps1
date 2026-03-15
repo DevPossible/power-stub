@@ -58,7 +58,7 @@ function Set-PowerStubCommandVisibility {
         throw "Stub '$Stub' not found. Use Get-PowerStubs to see registered stubs."
     }
 
-    $stubRoot = $stubs[$Stub]
+    $stubRoot = Get-PowerStubPath -StubConfig $stubs[$Stub]
     $commandsPath = Join-Path $stubRoot 'Commands'
 
     if (-not (Test-Path $commandsPath)) {

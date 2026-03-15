@@ -113,6 +113,15 @@ function Get-PowerStubCommand {
         return
     }
 
+    # Validate command file is within the Commands directory (prevent path traversal)
+    $resolvedPath = [System.IO.Path]::GetFullPath($commandFile.FullName)
+    $resolvedCommandsPath = [System.IO.Path]::GetFullPath($commandsPath)
+    if (-not $resolvedPath.StartsWith($resolvedCommandsPath + [System.IO.Path]::DirectorySeparatorChar) -and
+        $resolvedPath -ne $resolvedCommandsPath) {
+        Write-Warning "Command '$command' resolved outside the Commands directory. Blocked."
+        return
+    }
+
     $commandObj = Get-Command -Name $($commandFile.FullName) -ErrorAction SilentlyContinue
     return $commandObj
 }

@@ -18,7 +18,7 @@ None. You cannot pipe objects to Invoke-Authenticate.
 #>
 
 function Invoke-PowerStubCommand {
-    [cmdletbinding()]
+    [CmdletBinding()]
     param(
         [parameter(Position = 0)] [string] $stub,
         [parameter(Position = 1)] [string] $command,
@@ -221,28 +221,25 @@ function Invoke-PowerStubCommand {
             Throw "Command '$command' not found in stub '$stub'.`n`nStub path: $stubPath`nExpected: $stubPath\Commands\$command.ps1 or $stubPath\Commands\$command\$command.ps1"
         }
 
-        $line = $myinvocation.line
-        Write-Debug "line: $line"
-        Write-Debug "stub: $stub"
-        Write-Debug "command: $command"
-
-        $srch = "$stub $command"
-        $i = $line.IndexOf($srch)
-        $cmdArgs = $line.Substring($i + $srch.Length).Trim()
-
         $cmd = $commandObj.Path
 
-        if ($cmdArgs) {
-            Write-Host "Invoking $cmd with arguments: $cmdArgs"
-            invoke-CheckedCommandWithParams $cmd $null $cmdArgs $true
+        # Collect dynamic parameters (bound params that aren't our static or common params)
+        $forwardParams = @{}
+        $skipParams = @('Stub', 'Command', 'RemainingArgs')
+        $commonParamsList = @('Verbose', 'Debug', 'ErrorAction', 'WarningAction', 'InformationAction',
+            'ErrorVariable', 'WarningVariable', 'InformationVariable', 'OutVariable', 'OutBuffer',
+            'PipelineVariable', 'ProgressAction', 'WhatIf', 'Confirm')
+        foreach ($key in $PSBoundParameters.Keys) {
+            if ($key -notin $skipParams -and $key -notin $commonParamsList) {
+                $forwardParams[$key] = $PSBoundParameters[$key]
+            }
         }
-        elseif ($RemainingArgs -and $RemainingArgs.Count -gt 0) {
-            Write-Host "Invoking $cmd with positional arguments"
-            invoke-CheckedCommandWithParams $cmd $RemainingArgs $null $true
-        }
-        else {
-            Write-Host "Invoking $cmd"
-            invoke-CheckedCommandWithParams $cmd $null $null $true
-        }
+
+        Write-Debug "Command path: $cmd"
+        Write-Debug "Dynamic params: $($forwardParams.Keys -join ', ')"
+        Write-Debug "Remaining args: $($RemainingArgs -join ', ')"
+
+        Write-Host "Invoking $cmd"
+        Invoke-CheckedCommandWithParams -command $cmd -namedParams $forwardParams -positionalArgs $RemainingArgs
     }
 }

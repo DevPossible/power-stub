@@ -25,6 +25,7 @@ None. You cannot pipe objects to this function.
 
 function New-PowerStub {
     param(
+        [ValidatePattern('^[a-zA-Z][a-zA-Z0-9_\-]*$')]
         [string]$name,
         [string]$path,
         [switch]$force

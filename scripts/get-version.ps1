@@ -52,14 +52,19 @@ function Parse-Version {
 function Get-CommitsSinceTag {
     param([string]$Tag)
 
+    # Use %B (full body) instead of %s (subject only) to detect BREAKING CHANGE in commit body/footer
+    $separator = '---COMMIT-SEPARATOR---'
     if ($Tag) {
-        $commits = git log "$Tag..HEAD" --pretty=format:"%s" 2>$null
+        $raw = git log "$Tag..HEAD" --pretty=format:"%B${separator}" 2>$null
     } else {
-        $commits = git log --pretty=format:"%s" 2>$null
+        $raw = git log --pretty=format:"%B${separator}" 2>$null
     }
 
     if ($LASTEXITCODE -ne 0) { return @() }
-    return $commits -split "`n" | Where-Object { $_ }
+
+    # Split on separator and return non-empty commit bodies
+    $commitBodies = ($raw -join "`n") -split [regex]::Escape($separator) | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    return $commitBodies
 }
 
 # Main logic

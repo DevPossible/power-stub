@@ -1,20 +1,16 @@
 <#
 .SYNOPSIS
-  Imports configuration from the configuration file in the module folder.
+  Exports configuration to the configuration file.
 
 .DESCRIPTION
-
-.LINK
-
-.PARAMETER
+  Serializes the current configuration (excluding internal keys) to JSON
+  and writes it to the config file using atomic write (temp + rename).
 
 .INPUTS
 None. You cannot pipe objects to this function.
 
 .OUTPUTS
-
-.EXAMPLES
-
+None.
 #>
 
 
@@ -34,5 +30,9 @@ function Export-PowerStubConfiguration {
         if ($noExport -contains $key) { continue }
         $exportConfig[$key] = $Script:PSTBSettings[$key]
     }
-    $exportConfig | ConvertTo-Json | Set-Content -Path $fileName -Encoding UTF8
+
+    # Atomic write: write to temp file then rename to prevent corruption on concurrent access
+    $tempFile = "$fileName.tmp"
+    $exportConfig | ConvertTo-Json | Set-Content -Path $tempFile -Encoding UTF8
+    Move-Item -Path $tempFile -Destination $fileName -Force
 }

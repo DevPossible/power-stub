@@ -287,7 +287,7 @@ stages:
 
               # Push the tag to GitHub
               echo "Pushing tag v$(version) to GitHub..."
-              git push github "v$(version)" --force
+              git push github "v$(version)"
 
               echo "GitHub mirror sync complete"
             displayName: Push to GitHub

@@ -25,7 +25,7 @@ function Remove-PowerStub {
     )
     
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
-    if (-not $stubs.psobject.Properties.name -contains $name) {
+    if (-not $stubs.ContainsKey($name)) {
         throw "Stub $name does not exist."
     }
     

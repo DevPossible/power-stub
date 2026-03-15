@@ -80,9 +80,8 @@ if ($Tag) {
     $config.Filter.Tag = $Tag
 }
 
-if ($PassThru) {
-    $config.Run.PassThru = $true
-}
+# Always enable PassThru so $result is populated for exit code checking
+$config.Run.PassThru = $true
 
 # Run tests
 Write-Host "Running Pester tests..." -ForegroundColor Cyan
