@@ -191,7 +191,7 @@ Function New-DynamicParam {
     if ($mandatory) {
         $ParamAttr.Mandatory = $True
     }
-    if ($Position -ne $null) {
+    if ($PSBoundParameters.ContainsKey('Position')) {
         $ParamAttr.Position = $Position
     }
     if ($ValueFromPipelineByPropertyName) {
