@@ -197,4 +197,16 @@ if ($directAliases) {
 # NOTE: Git status checks are NOT performed on module load for performance.
 # Use 'pstb update --check' to check for updates manually.
 
+# Cleanup direct aliases on module removal
+$MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = {
+    $directAliases = Get-PowerStubConfigurationKey 'DirectAliases'
+    if ($directAliases) {
+        foreach ($aliasName in @($directAliases.Keys)) {
+            if (Test-Path "function:global:$aliasName") {
+                Remove-Item "function:global:$aliasName" -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
 Write-Verbose "PowerStub module loaded."

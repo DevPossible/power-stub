@@ -3,7 +3,8 @@
   Updates a Git repository by pulling latest changes.
 
 .DESCRIPTION
-  Performs a git pull on the specified repository path.
+  Performs a git pull on the specified repository path using git -C to
+  avoid changing the current working directory.
 
 .PARAMETER Path
   The path to the Git repository to update.
@@ -57,22 +58,14 @@ function Update-PowerStubGitRepo {
         }
     }
 
-    $originalLocation = Get-Location
-    try {
-        Set-Location $gitInfo.RepoRoot
+    # Perform git pull using -C to avoid changing directory
+    $pullOutput = git -C $gitInfo.RepoRoot pull 2>&1
+    $pullSuccess = $LASTEXITCODE -eq 0
 
-        # Perform git pull
-        $pullOutput = git pull 2>&1
-        $pullSuccess = $LASTEXITCODE -eq 0
-
-        return [PSCustomObject]@{
-            Success = $pullSuccess
-            Message = if ($pullSuccess) { "Repository updated successfully" } else { "Failed to update: $pullOutput" }
-            Path    = $gitInfo.RepoRoot
-            Output  = $pullOutput
-        }
-    }
-    finally {
-        Set-Location $originalLocation
+    return [PSCustomObject]@{
+        Success = $pullSuccess
+        Message = if ($pullSuccess) { "Repository updated successfully" } else { "Failed to update: $pullOutput" }
+        Path    = $gitInfo.RepoRoot
+        Output  = $pullOutput
     }
 }
