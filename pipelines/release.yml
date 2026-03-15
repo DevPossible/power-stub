@@ -59,6 +59,16 @@ stages:
                 exit 1
               fi
 
+              # Test write access (ls-remote with push check)
+              echo "Testing GitHub write access..."
+              PUSH_CHECK=$(git ls-remote "https://x-access-token:${GITHUB_PAT}@github.com/$(githubRepo).git" HEAD 2>&1)
+              if [ $? -eq 0 ]; then
+                echo "##[section]GitHub write access OK"
+              else
+                echo "##[warning]GitHub write access may be limited. Push may fail in Mirror stage."
+                echo "##[warning]Ensure PAT has 'contents: write' permission."
+              fi
+
               echo "##[section]GitHub access validation PASSED"
             displayName: Validate GitHub PAT
             env:
@@ -168,13 +178,23 @@ stages:
                 Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]false"
 
                 # Run version calculation script
-                $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1'
+                $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1' -Verbose
                 Write-Host "Calculated version: $version"
 
-                # Check if this version tag already exists
+                # Check if this version tag already exists (meaning no new commits)
                 $tagCheck = git rev-parse "v$version" 2>$null
                 if ($LASTEXITCODE -eq 0) {
-                    Write-Host "Tag v$version already exists, bumping patch..."
+                    # Check if the existing tag points to HEAD (nothing to release)
+                    $tagCommit = git rev-list -1 "v$version" 2>$null
+                    $headCommit = git rev-parse HEAD 2>$null
+                    if ($tagCommit -eq $headCommit) {
+                        Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
+                        Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                        Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]false"
+                        exit 0
+                    }
+
+                    Write-Host "Tag v$version already exists on a different commit, bumping patch..."
                     $parts = $version -split '\.'
                     $major = [int]$parts[0]
                     $minor = [int]$parts[1]
@@ -240,6 +260,7 @@ stages:
   - stage: Mirror
     displayName: Mirror to GitHub
     dependsOn: Version
+    condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
     variables:
       version: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.version'] ]
       tagExists: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.tagExists'] ]
@@ -297,6 +318,7 @@ stages:
   # Stage 5: Publish to PSGallery
   - stage: Publish
     displayName: Publish to PSGallery
+    condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
     dependsOn:
       - Version
       - Mirror
@@ -342,6 +364,13 @@ stages:
                 Write-Host "Module path: $(modulePath)"
                 Write-Host "Version: $(version)"
 
+                # Check if this version is already published (idempotency)
+                $existing = Find-Module -Name PowerStub -RequiredVersion '$(version)' -Repository PSGallery -ErrorAction SilentlyContinue
+                if ($existing) {
+                    Write-Host "PowerStub v$(version) is already published to PSGallery. Skipping publish."
+                    return
+                }
+
                 # Publish the module
                 Publish-Module -Path '$(modulePath)' -NuGetApiKey $apiKey -Verbose
 
@@ -351,6 +380,7 @@ stages:
   # Stage 6: Create GitHub Release
   - stage: Release
     displayName: Create GitHub Release
+    condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
     dependsOn:
       - Version
       - Mirror
