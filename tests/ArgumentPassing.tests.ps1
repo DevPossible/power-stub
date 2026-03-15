@@ -22,12 +22,17 @@
     SPECIAL CHARACTER ESCAPING STRATEGY - POWERSTUB
     ============================================================================
 
-    PowerStub handles argument passing differently for PS1 scripts vs EXE targets:
+    PowerStub forwards arguments using the call operator (&) with splatting.
+    Dynamic parameters are captured via DynamicParam and forwarded as a
+    hashtable splat (@namedParams). Remaining positional arguments are forwarded
+    as an array splat (@positionalArgs). PowerShell's parameter binder handles
+    all argument parsing before the proxy sees them.
 
     PS1 TARGETS (.ps1 files)
     ------------------------
-    Arguments are passed via Invoke-Expression with the raw command line.
-    PowerShell's normal quoting and escaping rules apply.
+    Named parameters: Captured by DynamicParam, forwarded via hashtable splatting.
+    Positional args: Captured by $RemainingArgs, forwarded via array splatting.
+    PowerShell's normal quoting and escaping rules apply at the call site.
 
     | To Pass This       | Use This                    | Example                     |
     |--------------------|-----------------------------|-----------------------------|
@@ -37,19 +42,14 @@
     | Literal "          | Backtick escape             | `"quoted`"                  |
     | Literal '          | Double it in single quotes  | 'It''s working'             |
     | Tab character      | Backtick-t                  | "col1`tcol2"                |
-    | Newline            | Backtick-n (may have issues)| "line1`nline2"              |
+    | Newline            | Backtick-n                  | "line1`nline2"              |
     | JSON with quotes   | Single-quoted string        | '{"key": "value"}'          |
 
     EXE TARGETS (.exe files)
     ------------------------
-    Arguments are passed with --% (stop-parsing) which prevents PowerShell
-    interpretation. Arguments are passed literally to the EXE.
-
-    | Behavior                | With --%              | Without --%           |
-    |------------------------|-----------------------|-----------------------|
-    | $variable              | Literal "$variable"   | Expanded value        |
-    | Quotes                 | Passed as-is          | PowerShell processed  |
-    | & | < > characters     | CMD interprets them   | PowerShell interprets |
+    Since no DynamicParam metadata exists for native commands, all arguments
+    go through $RemainingArgs and are forwarded as positional arguments.
+    PowerShell handles quoting/escaping for the subprocess automatically.
 
     SPECIAL CHARACTERS REFERENCE
     ----------------------------
@@ -60,14 +60,6 @@
       @    - Array/splat operator   - Usually safe in strings
       #    - Comment in some contexts
 
-    CMD/Batch Special (relevant when targeting EXEs):
-      &    - Command separator      - Quote the argument or use ^&
-      |    - Pipe operator          - Quote the argument or use ^|
-      <    - Input redirect         - Quote the argument or use ^<
-      >    - Output redirect        - Quote the argument or use ^>
-      ^    - Escape character       - Use ^^ to pass literal ^
-      %    - Environment variable   - Use %% in batch files
-
     Safe Characters (no escaping needed):
       a-z A-Z 0-9 . - _ / \ : = + [ ] { } ( ) , ; ' ~ ! @ #
 
@@ -77,19 +69,18 @@
       `a   - Alert/Bell
       `b   - Backspace
       `f   - Form feed
-      `n   - Newline (may cause parsing issues in raw line extraction)
-      `r   - Carriage return (may cause parsing issues)
+      `n   - Newline
+      `r   - Carriage return
       `t   - Tab
       `v   - Vertical tab
       `u{xxxx} - Unicode character
 
     KNOWN LIMITATIONS
     -----------------
-    1. Embedded newlines (`n) may cause parsing issues due to raw line extraction
-    2. Script-scoped variables may not expand through $myinvocation.line
-    3. Object parameters (hashtables, PSCustomObject) may fail due to missing
-       Get-NamedParameters function (undefined in Invoke-CheckedCommand.ps1)
-    4. Carriage returns and null characters may cause unexpected behavior
+    1. Embedded newlines/carriage returns may cause issues in some scenarios
+    2. Null characters may cause unexpected behavior
+    3. Arguments that look like PowerShell parameter names (-Param) may be
+       consumed by PowerShell's binder if they match a dynamic parameter name
 
     RECOMMENDED PRACTICES
     ---------------------
@@ -98,7 +89,6 @@
     3. Escape $ with `$ in double-quoted strings to prevent expansion
     4. For nested quotes: single inside double, or escape with backtick
     5. Test special characters in your specific use case
-    6. For EXEs: be aware that --% stops PowerShell parsing
 
     ============================================================================
 #>
