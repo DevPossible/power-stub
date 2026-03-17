@@ -182,11 +182,11 @@ stages:
                 Write-Host "Calculated version: $version"
 
                 # Check if this version tag already exists (meaning no new commits)
-                $tagCheck = git rev-parse "v$version" 2>$null
-                if ($LASTEXITCODE -eq 0) {
+                $tagMatch = git tag -l "v$version"
+                if ($tagMatch) {
                     # Check if the existing tag points to HEAD (nothing to release)
-                    $tagCommit = git rev-list -1 "v$version" 2>$null
-                    $headCommit = git rev-parse HEAD 2>$null
+                    $tagCommit = git rev-list -1 "v$version"
+                    $headCommit = git rev-parse HEAD
                     if ($tagCommit -eq $headCommit) {
                         Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
                         Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
@@ -202,8 +202,7 @@ stages:
 
                     do {
                         $patch++
-                        $checkTag = git rev-parse "v$major.$minor.$patch" 2>$null
-                    } while ($LASTEXITCODE -eq 0)
+                    } while (git tag -l "v$major.$minor.$patch")
 
                     $version = "$major.$minor.$patch"
                     Write-Host "Next available version: $version"
