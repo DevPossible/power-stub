@@ -162,15 +162,25 @@ stages:
               script: |
                 $ErrorActionPreference = 'Stop'
 
+                Write-Host "##[group]Trace: Environment"
+                Write-Host "[TRACE] HEAD: $(git rev-parse HEAD)"
+                Write-Host "[TRACE] Branch: $(git branch --show-current)"
+                Write-Host "[TRACE] All tags at HEAD: $(git tag --points-at HEAD)"
+                Write-Host "[TRACE] Last tag: $(git describe --tags --abbrev=0 2>$null)"
+                Write-Host "##[endgroup]"
+
                 # Check if HEAD already has a tag
                 $existingTag = git tag --points-at HEAD | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
+                Write-Host "[TRACE] existingTag = '$existingTag'"
 
                 if ($existingTag) {
                     $version = $existingTag -replace '^v', ''
                     Write-Host "Found existing tag: $existingTag"
+                    Write-Host "[TRACE] Path: EXISTING_TAG -> shouldRelease=true, tagExists=true, version=$version"
                     Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                     Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]true"
                     Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
+                    Write-Host "[TRACE] Output variables set (existing tag path)"
                     return
                 }
 
@@ -180,16 +190,23 @@ stages:
                 # Run version calculation script
                 $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1'
                 Write-Host "Calculated version: $version"
+                Write-Host "[TRACE] get-version.ps1 returned: '$version' (type: $($version.GetType().Name))"
 
                 # Check if this version tag already exists
                 $tagMatch = git tag -l "v$version"
+                Write-Host "[TRACE] git tag -l v$version = '$tagMatch'"
+
                 if ($tagMatch) {
                     $tagCommit = git rev-list -1 "v$version"
                     $headCommit = git rev-parse HEAD
+                    Write-Host "[TRACE] Tag v$version points to: $tagCommit, HEAD is: $headCommit"
+
                     if ($tagCommit -eq $headCommit) {
                         Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
+                        Write-Host "[TRACE] Path: TAG_AT_HEAD -> shouldRelease=false, version=$version"
                         Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                         Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]false"
+                        Write-Host "[TRACE] Output variables set (tag at HEAD path)"
                         return
                     }
 
@@ -204,12 +221,26 @@ stages:
                     } while (git tag -l "v$major.$minor.$patch")
 
                     $version = "$major.$minor.$patch"
-                    Write-Host "Next available version: $version"
+                    Write-Host "[TRACE] Bumped to next available version: $version"
                 }
 
+                Write-Host "[TRACE] Path: NEW_RELEASE -> shouldRelease=true, version=$version"
                 Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                 Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                 Write-Host "Version: $version"
+                Write-Host "[TRACE] Output variables set (new release path)"
+              pwsh: true
+
+          - task: PowerShell@2
+            displayName: Review variables (Version)
+            inputs:
+              targetType: inline
+              script: |
+                Write-Host "##[group]Trace: Version stage output variables"
+                Write-Host "[TRACE] versionStep.version    = '$(versionStep.version)'"
+                Write-Host "[TRACE] versionStep.tagExists   = '$(versionStep.tagExists)'"
+                Write-Host "[TRACE] versionStep.shouldRelease = '$(versionStep.shouldRelease)'"
+                Write-Host "##[endgroup]"
               pwsh: true
 
           - task: PowerShell@2
@@ -219,6 +250,8 @@ stages:
               script: |
                 $ErrorActionPreference = 'Stop'
                 $version = '$(versionStep.version)'
+                Write-Host "[TRACE] changelog: version = '$version'"
+
                 $lastTag = git describe --tags --abbrev=0 'HEAD^' 2>$null
                 if (-not $lastTag) {
                     $lastTag = git describe --tags --abbrev=0 2>$null
@@ -270,6 +303,19 @@ stages:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
+
+          - task: PowerShell@2
+            displayName: Review variables (Mirror)
+            inputs:
+              targetType: inline
+              script: |
+                Write-Host "##[group]Trace: Mirror stage variables"
+                Write-Host "[TRACE] version    = '$(version)'"
+                Write-Host "[TRACE] tagExists   = '$(tagExists)'"
+                Write-Host "[TRACE] githubRepo  = '$(githubRepo)'"
+                Write-Host "[TRACE] sourceBranch = '$(Build.SourceBranchName)'"
+                Write-Host "##[endgroup]"
+              pwsh: true
 
           - bash: |
               git config user.email "azure-pipelines@devpossible.com"
@@ -330,6 +376,17 @@ stages:
           - checkout: self
 
           - task: PowerShell@2
+            displayName: Review variables (Publish)
+            inputs:
+              targetType: inline
+              script: |
+                Write-Host "##[group]Trace: Publish stage variables"
+                Write-Host "[TRACE] version    = '$(version)'"
+                Write-Host "[TRACE] modulePath  = '$(modulePath)'"
+                Write-Host "##[endgroup]"
+              pwsh: true
+
+          - task: PowerShell@2
             displayName: Update Module Version
             inputs:
               targetType: inline
@@ -337,7 +394,7 @@ stages:
                 $manifestPath = '$(modulePath)/PowerStub.psd1'
                 $version = '$(version)'
 
-                Write-Host "Updating manifest version to: $version"
+                Write-Host "[TRACE] Updating manifest: $manifestPath -> v$version"
                 Update-ModuleManifest -Path $manifestPath -ModuleVersion $version
 
                 # Verify update
@@ -358,16 +415,18 @@ stages:
                 }
 
                 Write-Host "Publishing PowerStub module to PowerShell Gallery..."
-                Write-Host "Module path: $(modulePath)"
-                Write-Host "Version: $(version)"
+                Write-Host "[TRACE] modulePath = '$(modulePath)'"
+                Write-Host "[TRACE] version    = '$(version)'"
 
                 # Check if this version is already published (idempotency)
                 $existing = Find-Module -Name PowerStub -RequiredVersion '$(version)' -Repository PSGallery -ErrorAction SilentlyContinue
                 if ($existing) {
+                    Write-Host "[TRACE] Already published, skipping"
                     Write-Host "PowerStub v$(version) is already published to PSGallery. Skipping publish."
                     return
                 }
 
+                Write-Host "[TRACE] Not yet published, proceeding with Publish-Module"
                 # Publish the module
                 Publish-Module -Path '$(modulePath)' -NuGetApiKey $apiKey -Verbose
 
@@ -392,6 +451,18 @@ stages:
         steps:
           - checkout: self
             fetchDepth: 0
+
+          - task: PowerShell@2
+            displayName: Review variables (Release)
+            inputs:
+              targetType: inline
+              script: |
+                Write-Host "##[group]Trace: Release stage variables"
+                Write-Host "[TRACE] version      = '$(version)'"
+                Write-Host "[TRACE] githubRepo   = '$(githubRepo)'"
+                Write-Host "[TRACE] sourceVersion = '$(Build.SourceVersion)'"
+                Write-Host "##[endgroup]"
+              pwsh: true
 
           - download: current
             artifact: changelog
