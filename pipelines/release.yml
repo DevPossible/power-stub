@@ -290,7 +290,7 @@ stages:
   - stage: Mirror
     displayName: Mirror to GitHub
     dependsOn: Version
-    condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
+    #condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
     variables:
       version: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.version'] ]
       tagExists: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.tagExists'] ]
@@ -361,7 +361,7 @@ stages:
   # Stage 5: Publish to PSGallery
   - stage: Publish
     displayName: Publish to PSGallery
-    condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
+    #condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
     dependsOn:
       - Version
       - Mirror
@@ -436,7 +436,7 @@ stages:
   # Stage 6: Create GitHub Release
   - stage: Release
     displayName: Create GitHub Release
-    condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
+    #condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
     dependsOn:
       - Version
       - Mirror
