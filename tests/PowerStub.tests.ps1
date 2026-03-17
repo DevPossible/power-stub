@@ -906,31 +906,31 @@ Describe "Virtual Verbs" {
     }
 
     Context "Search-PowerStubCommands" {
+        BeforeAll {
+            # Cache search results — Get-Help is slow, especially in CI
+            $script:deployResults = Search-PowerStubCommands "deploy"
+            $script:noMatchResults = Search-PowerStubCommands "xyznonexistent123456"
+        }
+
         It "Should find commands by name" {
-            $results = Search-PowerStubCommands "deploy"
-            $results | Should -Not -BeNullOrEmpty
-            $results.Command | Should -Contain "deploy"
+            $script:deployResults | Should -Not -BeNullOrEmpty
+            $script:deployResults.Command | Should -Contain "deploy"
         }
 
         It "Should find commands by help text" {
-            # The deploy command has 'environment' in its parameters/help
-            $results = Search-PowerStubCommands "production"
-            # This may or may not find results depending on help content
-            # Just verify it doesn't throw
+            # Verify search doesn't throw (help text searching is exercised by the BeforeAll call)
             { Search-PowerStubCommands "production" } | Should -Not -Throw
         }
 
         It "Should return empty for no matches" {
-            $results = Search-PowerStubCommands "xyznonexistent123456"
-            $results | Should -BeNullOrEmpty
+            $script:noMatchResults | Should -BeNullOrEmpty
         }
 
         It "Should return structured results with Stub, Command, Synopsis" {
-            $results = Search-PowerStubCommands "deploy"
-            $results | Should -Not -BeNullOrEmpty
-            $results[0].PSObject.Properties.Name | Should -Contain 'Stub'
-            $results[0].PSObject.Properties.Name | Should -Contain 'Command'
-            $results[0].PSObject.Properties.Name | Should -Contain 'Synopsis'
+            $script:deployResults | Should -Not -BeNullOrEmpty
+            $script:deployResults[0].PSObject.Properties.Name | Should -Contain 'Stub'
+            $script:deployResults[0].PSObject.Properties.Name | Should -Contain 'Command'
+            $script:deployResults[0].PSObject.Properties.Name | Should -Contain 'Synopsis'
         }
     }
 
