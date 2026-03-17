@@ -156,6 +156,7 @@ stages:
 
           - task: PowerShell@2
             displayName: Calculate version from commits
+            name: versionStep
             inputs:
               targetType: inline
               script: |
@@ -167,14 +168,14 @@ stages:
                 if ($existingTag) {
                     $version = $existingTag -replace '^v', ''
                     Write-Host "Found existing tag: $existingTag"
-                    Write-Host "##vso[task.setvariable variable=myVersion]$version"
-                    Write-Host "##vso[task.setvariable variable=myTagExists]true"
-                    Write-Host "##vso[task.setvariable variable=myShouldRelease]true"
+                    Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                    Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]true"
+                    Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                     return
                 }
 
                 Write-Host "No existing tag on HEAD, calculating version from commits..."
-                Write-Host "##vso[task.setvariable variable=myTagExists]false"
+                Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]false"
 
                 # Run version calculation script
                 $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1'
@@ -187,8 +188,8 @@ stages:
                     $headCommit = git rev-parse HEAD
                     if ($tagCommit -eq $headCommit) {
                         Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
-                        Write-Host "##vso[task.setvariable variable=myVersion]$version"
-                        Write-Host "##vso[task.setvariable variable=myShouldRelease]false"
+                        Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                        Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]false"
                         return
                     }
 
@@ -206,18 +207,10 @@ stages:
                     Write-Host "Next available version: $version"
                 }
 
-                Write-Host "##vso[task.setvariable variable=myVersion]$version"
-                Write-Host "##vso[task.setvariable variable=myShouldRelease]true"
+                Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                 Write-Host "Version: $version"
               pwsh: true
-
-          - bash: |
-              echo "##vso[task.setvariable variable=version;isOutput=true]$(myVersion)"
-              echo "##vso[task.setvariable variable=tagExists;isOutput=true]$(myTagExists)"
-              echo "##vso[task.setvariable variable=shouldRelease;isOutput=true]$(myShouldRelease)"
-              echo "Cross-stage outputs: version=$(myVersion) tagExists=$(myTagExists) shouldRelease=$(myShouldRelease)"
-            displayName: Set cross-stage output variables
-            name: versionStep
 
           - task: PowerShell@2
             displayName: Generate changelog
@@ -225,7 +218,7 @@ stages:
               targetType: inline
               script: |
                 $ErrorActionPreference = 'Stop'
-                $version = '$(myVersion)'
+                $version = '$(versionStep.version)'
                 $lastTag = git describe --tags --abbrev=0 'HEAD^' 2>$null
                 if (-not $lastTag) {
                     $lastTag = git describe --tags --abbrev=0 2>$null
