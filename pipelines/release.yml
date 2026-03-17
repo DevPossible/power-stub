@@ -163,15 +163,19 @@ stages:
                 $ErrorActionPreference = 'Stop'
 
                 # Check if HEAD already has a tag
-                $existingTag = git tag --points-at HEAD 2>$null | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
+                $existingTag = git tag --points-at HEAD | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
 
                 if ($existingTag) {
                     $version = $existingTag -replace '^v', ''
                     Write-Host "Found existing tag: $existingTag"
+                    Write-Host "[TRACE] Path: existing tag at HEAD, setting shouldRelease=true"
                     Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                     Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]true"
                     Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                     return
+                }
+                else {
+                    Write-Host "[TRACE] No semver tag at HEAD (raw tags: $(git tag --points-at HEAD))"
                 }
 
                 Write-Host "No existing tag on HEAD, calculating version from commits..."
@@ -189,9 +193,13 @@ stages:
                     $headCommit = git rev-parse HEAD
                     if ($tagCommit -eq $headCommit) {
                         Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
+                        Write-Host "[TRACE] Path: tag v$version exists at HEAD, setting shouldRelease=false"
                         Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                         Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]false"
                         return
+                    }
+                    else {
+                        Write-Host "[TRACE] Tag v$version exists but at $tagCommit, HEAD is $headCommit"
                     }
 
                     Write-Host "Tag v$version already exists on a different commit, bumping patch..."
@@ -207,7 +215,11 @@ stages:
                     $version = "$major.$minor.$patch"
                     Write-Host "Next available version: $version"
                 }
+                else {
+                    Write-Host "[TRACE] Tag v$version does not exist, new release"
+                }
 
+                Write-Host "[TRACE] Path: new version, setting shouldRelease=true"
                 Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                 Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                 Write-Host "Version: $version"
