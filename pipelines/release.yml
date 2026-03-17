@@ -156,7 +156,6 @@ stages:
 
           - task: PowerShell@2
             displayName: Calculate version from commits
-            name: versionStep
             inputs:
               targetType: inline
               script: |
@@ -168,38 +167,29 @@ stages:
                 if ($existingTag) {
                     $version = $existingTag -replace '^v', ''
                     Write-Host "Found existing tag: $existingTag"
-                    Write-Host "[TRACE] Path: existing tag at HEAD, setting shouldRelease=true"
-                    Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
-                    Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]true"
-                    Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
+                    Write-Host "##vso[task.setvariable variable=myVersion]$version"
+                    Write-Host "##vso[task.setvariable variable=myTagExists]true"
+                    Write-Host "##vso[task.setvariable variable=myShouldRelease]true"
                     return
-                }
-                else {
-                    Write-Host "[TRACE] No semver tag at HEAD (raw tags: $(git tag --points-at HEAD))"
                 }
 
                 Write-Host "No existing tag on HEAD, calculating version from commits..."
-                Write-Host "##vso[task.setvariable variable=tagExists;isOutput=true]false"
+                Write-Host "##vso[task.setvariable variable=myTagExists]false"
 
                 # Run version calculation script
                 $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1' -Verbose
                 Write-Host "Calculated version: $version"
 
-                # Check if this version tag already exists (meaning no new commits)
+                # Check if this version tag already exists
                 $tagMatch = git tag -l "v$version"
                 if ($tagMatch) {
-                    # Check if the existing tag points to HEAD (nothing to release)
                     $tagCommit = git rev-list -1 "v$version"
                     $headCommit = git rev-parse HEAD
                     if ($tagCommit -eq $headCommit) {
                         Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
-                        Write-Host "[TRACE] Path: tag v$version exists at HEAD, setting shouldRelease=false"
-                        Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
-                        Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]false"
+                        Write-Host "##vso[task.setvariable variable=myVersion]$version"
+                        Write-Host "##vso[task.setvariable variable=myShouldRelease]false"
                         return
-                    }
-                    else {
-                        Write-Host "[TRACE] Tag v$version exists but at $tagCommit, HEAD is $headCommit"
                     }
 
                     Write-Host "Tag v$version already exists on a different commit, bumping patch..."
@@ -215,15 +205,19 @@ stages:
                     $version = "$major.$minor.$patch"
                     Write-Host "Next available version: $version"
                 }
-                else {
-                    Write-Host "[TRACE] Tag v$version does not exist, new release"
-                }
 
-                Write-Host "[TRACE] Path: new version, setting shouldRelease=true"
-                Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
-                Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
+                Write-Host "##vso[task.setvariable variable=myVersion]$version"
+                Write-Host "##vso[task.setvariable variable=myShouldRelease]true"
                 Write-Host "Version: $version"
               pwsh: true
+
+          - bash: |
+              echo "##vso[task.setvariable variable=version;isOutput=true]$(myVersion)"
+              echo "##vso[task.setvariable variable=tagExists;isOutput=true]$(myTagExists)"
+              echo "##vso[task.setvariable variable=shouldRelease;isOutput=true]$(myShouldRelease)"
+              echo "Cross-stage outputs: version=$(myVersion) tagExists=$(myTagExists) shouldRelease=$(myShouldRelease)"
+            displayName: Set cross-stage output variables
+            name: versionStep
 
           - task: PowerShell@2
             displayName: Generate changelog
@@ -231,7 +225,7 @@ stages:
               targetType: inline
               script: |
                 $ErrorActionPreference = 'Stop'
-                $version = '$(versionStep.version)'
+                $version = '$(myVersion)'
                 $lastTag = git describe --tags --abbrev=0 'HEAD^' 2>$null
                 if (-not $lastTag) {
                     $lastTag = git describe --tags --abbrev=0 2>$null
