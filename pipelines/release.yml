@@ -191,7 +191,7 @@ stages:
                         Write-Host "##[warning]Tag v$version already exists at HEAD. Nothing to release."
                         Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                         Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]false"
-                        exit 0
+                        return
                     }
 
                     Write-Host "Tag v$version already exists on a different commit, bumping patch..."
@@ -212,7 +212,6 @@ stages:
                 Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                 Write-Host "##vso[task.setvariable variable=shouldRelease;isOutput=true]true"
                 Write-Host "Version: $version"
-                exit 0
               pwsh: true
 
           - task: PowerShell@2
