@@ -177,7 +177,7 @@ stages:
                 Write-Host "##vso[task.setvariable variable=myTagExists]false"
 
                 # Run version calculation script
-                $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1' -Verbose
+                $version = & '$(Build.SourcesDirectory)/scripts/get-version.ps1'
                 Write-Host "Calculated version: $version"
 
                 # Check if this version tag already exists
