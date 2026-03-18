@@ -154,11 +154,45 @@ function Invoke-PowerStubCommand {
             }
         }
 
+        # Parse RemainingArgs to extract named parameters that match the target command.
+        # This handles the case where callers use array splatting (& pstb @args) which
+        # passes all elements as positional, preventing DynamicParam from capturing named params.
+        $effectivePositionalArgs = @()
+        if ($RemainingArgs -and $RemainingArgs.Count -gt 0) {
+            $cmdParams = $commandObj.Parameters
+            $i = 0
+            while ($i -lt $RemainingArgs.Count) {
+                $arg = $RemainingArgs[$i]
+                if ($arg -is [string] -and $arg.StartsWith('-') -and $arg.Length -gt 1) {
+                    $paramName = $arg.Substring(1)
+                    if ($cmdParams.ContainsKey($paramName) -and -not $forwardParams.ContainsKey($paramName)) {
+                        $paramType = $cmdParams[$paramName].ParameterType
+                        if ($paramType -eq [System.Management.Automation.SwitchParameter]) {
+                            $forwardParams[$paramName] = $true
+                        }
+                        else {
+                            $i++
+                            if ($i -lt $RemainingArgs.Count) {
+                                $forwardParams[$paramName] = $RemainingArgs[$i]
+                            }
+                        }
+                    }
+                    else {
+                        $effectivePositionalArgs += $arg
+                    }
+                }
+                else {
+                    $effectivePositionalArgs += $arg
+                }
+                $i++
+            }
+        }
+
         Write-Debug "Command path: $cmd"
         Write-Debug "Dynamic params: $($forwardParams.Keys -join ', ')"
-        Write-Debug "Remaining args: $($RemainingArgs -join ', ')"
+        Write-Debug "Remaining args: $($effectivePositionalArgs -join ', ')"
 
         Write-Host "Invoking $cmd"
-        Invoke-CheckedCommandWithParams -command $cmd -namedParams $forwardParams -positionalArgs $RemainingArgs
+        Invoke-CheckedCommandWithParams -command $cmd -namedParams $forwardParams -positionalArgs $effectivePositionalArgs
     }
 }
