@@ -362,9 +362,7 @@ stages:
   - stage: Publish
     displayName: Publish to PSGallery
     #condition: and(succeeded(), eq(stageDependencies.Version.CalculateVersion.outputs['versionStep.shouldRelease'], 'true'))
-    dependsOn:
-      - Version
-      - Mirror
+    dependsOn: Version
     variables:
       version: $[ stageDependencies.Version.CalculateVersion.outputs['versionStep.version'] ]
     jobs:
