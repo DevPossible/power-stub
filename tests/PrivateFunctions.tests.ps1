@@ -457,8 +457,8 @@ Describe "Export-PowerStubConfiguration" {
                 Export-PowerStubConfiguration
 
                 $configFile = Get-PowerStubConfigurationKey 'ConfigFile'
-                $tempFile   = "$configFile.tmp"
-                Test-Path $tempFile | Should -Be $false
+                $tempFiles = @(Get-ChildItem -LiteralPath (Split-Path $configFile -Parent) -Filter "$([System.IO.Path]::GetFileName($configFile)).*.tmp" -ErrorAction SilentlyContinue)
+                $tempFiles.Count | Should -Be 0
             }
         }
 
@@ -469,6 +469,61 @@ Describe "Export-PowerStubConfiguration" {
                 $configFile = Get-PowerStubConfigurationKey 'ConfigFile'
                 $raw = Get-Content $configFile -Raw
                 { $raw | ConvertFrom-Json } | Should -Not -Throw
+            }
+        }
+
+        It "Export-PowerStubConfiguration_ConcurrentModuleImports_PreserveConfigAndAliases" {
+            $tempAppData = Join-Path $env:TEMP "PSTBImportRaceTest_$(Get-Random)"
+            $configDir = Join-Path $tempAppData 'PowerStub'
+            $configFile = Join-Path $configDir 'config.json'
+            $modulePath = Join-Path $PSScriptRoot '..\PowerStub\PowerStub.psm1'
+
+            try {
+                New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+
+                @{
+                    InvokeAlias = 'pstb'
+                    Stubs = @{
+                        SampleStub = @{
+                            Path = $script:SampleStubRoot
+                        }
+                    }
+                    DirectAliases = @{
+                        sample = 'SampleStub'
+                    }
+                    'EnablePrefix:Alpha' = $false
+                    'EnablePrefix:Beta' = $false
+                    GitEnabled = $false
+                } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $configFile -Encoding UTF8
+
+                $jobs = 1..8 | ForEach-Object {
+                    Start-Job -ScriptBlock {
+                        param($ModulePath, $AppData)
+
+                        $env:APPDATA = $AppData
+                        Import-Module $ModulePath -Force -WarningAction Stop
+
+                        [PSCustomObject]@{
+                            HasInvokeAlias = [bool](Get-Command pstb -ErrorAction SilentlyContinue)
+                            HasDirectAlias = [bool](Get-Command sample -ErrorAction SilentlyContinue)
+                            StubCount      = @((Get-PowerStubConfiguration)['Stubs'].Keys).Count
+                        }
+                    } -ArgumentList $modulePath, $tempAppData
+                }
+
+                $results = @($jobs | Receive-Job -Wait -AutoRemoveJob -ErrorAction Stop)
+                $results.Count | Should -Be 8
+                $results.HasInvokeAlias | Should -Not -Contain $false
+                $results.HasDirectAlias | Should -Not -Contain $false
+                $results.StubCount | Should -Not -Contain 0
+
+                $raw = Get-Content -LiteralPath $configFile -Raw
+                { $raw | ConvertFrom-Json } | Should -Not -Throw
+            }
+            finally {
+                if (Test-Path -LiteralPath $tempAppData) {
+                    Remove-Item -LiteralPath $tempAppData -Recurse -Force
+                }
             }
         }
     }

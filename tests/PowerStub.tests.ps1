@@ -687,7 +687,7 @@ Describe "New-PowerStubDirectAlias" {
 
     BeforeEach {
         # Clean up any test aliases thoroughly
-        @('teststub', 'ts', 'myalias', 'forcealias', 'configalias') | ForEach-Object {
+        @('teststub', 'ts', 'myalias', 'forcealias', 'configalias', 'noopalias') | ForEach-Object {
             # Remove from function: drive
             Remove-Item "function:$_" -ErrorAction SilentlyContinue
             Remove-Item "function:global:$_" -ErrorAction SilentlyContinue
@@ -698,7 +698,7 @@ Describe "New-PowerStubDirectAlias" {
 
     AfterAll {
         # Clean up test aliases
-        @('teststub', 'ts', 'myalias', 'forcealias', 'configalias') | ForEach-Object {
+        @('teststub', 'ts', 'myalias', 'forcealias', 'configalias', 'noopalias') | ForEach-Object {
             Remove-Item "function:$_" -ErrorAction SilentlyContinue
             Remove-Item "function:global:$_" -ErrorAction SilentlyContinue
         }
@@ -765,6 +765,18 @@ Describe "New-PowerStubDirectAlias" {
             $directAliases = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'DirectAliases' }
             $directAliases | Should -Not -BeNullOrEmpty
             $directAliases['configalias'] | Should -Be 'SampleStub'
+        }
+
+        It "Should not rewrite config when the persisted alias already matches" {
+            New-PowerStubDirectAlias -AliasName "noopalias" -Stub "SampleStub"
+            $configFile = InModuleScope PowerStub { Get-PowerStubConfigurationKey 'ConfigFile' }
+            $before = Get-Item -LiteralPath $configFile
+
+            Start-Sleep -Milliseconds 1200
+            New-PowerStubDirectAlias -AliasName "noopalias" -Stub "SampleStub" -Force
+
+            $after = Get-Item -LiteralPath $configFile
+            $after.LastWriteTimeUtc | Should -Be $before.LastWriteTimeUtc
         }
     }
 

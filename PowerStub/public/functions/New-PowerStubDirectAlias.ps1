@@ -159,8 +159,10 @@ function New-PowerStubDirectAlias {
     if (-not $directAliases) {
         $directAliases = @{}
     }
-    $directAliases[$AliasName] = $Stub
-    Set-PowerStubConfigurationKey 'DirectAliases' $directAliases
+    if (-not $directAliases.ContainsKey($AliasName) -or $directAliases[$AliasName] -ne $Stub) {
+        $directAliases[$AliasName] = $Stub
+        Set-PowerStubConfigurationKey 'DirectAliases' $directAliases
+    }
 
     # Return info object
     $stubConfig = $stubs[$Stub]
