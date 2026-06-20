@@ -159,13 +159,14 @@ version:
             $compareUrl = "https://github.com/$env:GITHUB_REPO/commits/v${version}"
         }
 
-        $changelog = @"
-## Whats Changed
-
-$($commits -join "`n")
-
-**Full Changelog**: $compareUrl
-"@
+        $changelogLines = @(
+            "## Whats Changed"
+            ""
+            $commits
+            ""
+            "**Full Changelog**: $compareUrl"
+        )
+        $changelog = $changelogLines -join "`n"
 
         $changelog | Set-Content -Path "$env:CI_PROJECT_DIR/changelog.md" -Encoding UTF8
 
