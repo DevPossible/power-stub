@@ -431,7 +431,7 @@ Describe "Export-PowerStubConfiguration" {
         It "Export-PowerStubConfiguration_MissingConfigDir_CreatesDirectoryAndFile" {
             InModuleScope PowerStub {
                 # Point the config file to a subdirectory that does not yet exist
-                $tempRoot = Join-Path $env:TEMP "PSTBExportTest_$(Get-Random)"
+                $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "PSTBExportTest_$(Get-Random)"
                 $tempConfig = Join-Path $tempRoot 'subdir\config.json'
                 $originalFile = Get-PowerStubConfigurationKey 'ConfigFile'
 
@@ -473,7 +473,7 @@ Describe "Export-PowerStubConfiguration" {
         }
 
         It "Export-PowerStubConfiguration_ConcurrentModuleImports_PreserveConfigAndAliases" {
-            $tempAppData = Join-Path $env:TEMP "PSTBImportRaceTest_$(Get-Random)"
+            $tempAppData = Join-Path ([System.IO.Path]::GetTempPath()) "PSTBImportRaceTest_$(Get-Random)"
             $configDir = Join-Path $tempAppData 'PowerStub'
             $configFile = Join-Path $configDir 'config.json'
             $modulePath = Join-Path $PSScriptRoot '..\PowerStub\PowerStub.psm1'
@@ -528,7 +528,7 @@ Describe "Export-PowerStubConfiguration" {
         }
 
         It "Export-PowerStubConfiguration_ExternalProcessRegistration_IsVisibleInLoadedSession" {
-            $tempRoot = Join-Path $env:TEMP "PSTBExternalConfigTest_$(Get-Random)"
+            $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "PSTBExternalConfigTest_$(Get-Random)"
             $tempAppData = Join-Path $tempRoot 'appdata'
             $stubPath = Join-Path $tempRoot 'stub'
             $mainScript = Join-Path $tempRoot 'main.ps1'
@@ -710,7 +710,7 @@ Describe "Remove-PowerStub - error scenarios" {
         }
 
         It "Remove-PowerStub_AfterStubRemoved_SecondRemoveThrows" {
-            $testPath = Join-Path $env:TEMP "PSTBRemoveTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PSTBRemoveTest_$(Get-Random)"
             try {
                 New-PowerStub -Name "TempStub" -Path $testPath
                 Remove-PowerStub -Name "TempStub"
@@ -799,7 +799,7 @@ Describe "Set-PowerStubCommandVisibility - subfolder commands" {
     BeforeAll {
         Import-PowerStubConfiguration -Reset
 
-        $script:SubfolderVisTestPath = Join-Path $env:TEMP "PSTBSubVisTest_$(Get-Random)"
+        $script:SubfolderVisTestPath = Join-Path ([System.IO.Path]::GetTempPath()) "PSTBSubVisTest_$(Get-Random)"
         New-PowerStub -Name "SubVisStub" -Path $script:SubfolderVisTestPath -Force
 
         # Build a subfolder command structure
@@ -897,7 +897,7 @@ Describe "Set-PowerStubCommandVisibility - WhatIf support" {
     BeforeAll {
         Import-PowerStubConfiguration -Reset
 
-        $script:WhatIfTestPath = Join-Path $env:TEMP "PSTBWhatIfTest_$(Get-Random)"
+        $script:WhatIfTestPath = Join-Path ([System.IO.Path]::GetTempPath()) "PSTBWhatIfTest_$(Get-Random)"
         New-PowerStub -Name "WhatIfStub" -Path $script:WhatIfTestPath -Force
 
         $commandsPath = Join-Path $script:WhatIfTestPath 'Commands'

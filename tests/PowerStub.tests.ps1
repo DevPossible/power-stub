@@ -168,7 +168,7 @@ Describe "Stub Management" {
 
     Context "New-PowerStub" {
         It "Should register a new stub" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath
@@ -185,7 +185,7 @@ Describe "Stub Management" {
         }
 
         It "Should create the folder structure" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath
@@ -202,7 +202,7 @@ Describe "Stub Management" {
         }
 
         It "Should throw when stub already exists without -Force" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath
@@ -216,8 +216,8 @@ Describe "Stub Management" {
         }
 
         It "Should overwrite when -Force is specified" {
-            $testPath1 = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
-            $testPath2 = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath1 = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
+            $testPath2 = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath1
@@ -233,7 +233,7 @@ Describe "Stub Management" {
         }
 
         It "Should persist configuration to file" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath
@@ -251,7 +251,7 @@ Describe "Stub Management" {
 
     Context "Remove-PowerStub" {
         It "Should remove a registered stub" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath
@@ -268,7 +268,7 @@ Describe "Stub Management" {
         }
 
         It "Should not delete the folder (files remain)" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "TestStub" -Path $testPath
@@ -294,8 +294,8 @@ Describe "Stub Management" {
         }
 
         It "Should return all registered stubs" {
-            $testPath1 = Join-Path $env:TEMP "PowerStubTest1_$(Get-Random)"
-            $testPath2 = Join-Path $env:TEMP "PowerStubTest2_$(Get-Random)"
+            $testPath1 = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest1_$(Get-Random)"
+            $testPath2 = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest2_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "Stub1" -Path $testPath1
@@ -1006,7 +1006,7 @@ Describe "Set-PowerStubCommandVisibility" {
     BeforeAll {
         Import-PowerStubConfiguration -Reset
         # Create a test stub with a command we can modify
-        $script:VisibilityTestPath = Join-Path $env:TEMP "PowerStubVisibilityTest_$(Get-Random)"
+        $script:VisibilityTestPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubVisibilityTest_$(Get-Random)"
         New-PowerStub -Name "VisibilityStub" -Path $script:VisibilityTestPath -Force
 
         # Create a test command
@@ -1149,7 +1149,7 @@ Describe "Edge Cases and Error Handling" {
 
     Context "Invalid Input" {
         It "Should handle missing Commands folder gracefully" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
             New-Item $testPath -ItemType Directory -Force | Out-Null
 
             try {
@@ -1170,7 +1170,7 @@ Describe "Edge Cases and Error Handling" {
 
     Context "Special Characters" {
         It "Should handle stub names with valid characters" {
-            $testPath = Join-Path $env:TEMP "PowerStubTest_$(Get-Random)"
+            $testPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubTest_$(Get-Random)"
 
             try {
                 New-PowerStub -Name "Test-Stub_123" -Path $testPath

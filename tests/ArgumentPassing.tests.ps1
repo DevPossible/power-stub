@@ -742,7 +742,7 @@ Describe "Argument Passing - EXE Targets" {
         Import-PowerStubConfiguration -Reset
 
         # Create a temporary stub with EXE symlinks
-        $script:ExeStubPath = Join-Path $env:TEMP "PowerStubExeTest_$(Get-Random)"
+        $script:ExeStubPath = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStubExeTest_$(Get-Random)"
         $script:ExeCommandsPath = Join-Path $script:ExeStubPath 'Commands'
 
         New-Item -Path $script:ExeCommandsPath -ItemType Directory -Force | Out-Null
@@ -786,7 +786,7 @@ Describe "Argument Passing - EXE Targets" {
     Context "EXE Argument Passthrough" {
         It "Should pass arguments to findstr.exe" -Skip:(-not $script:ExeLinksCreated) {
             # Create a temp file for testing
-            $tempFile = Join-Path $env:TEMP "findstr_test_$(Get-Random).txt"
+            $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "findstr_test_$(Get-Random).txt"
             "line one`nline two`nline three" | Set-Content $tempFile
 
             try {
@@ -799,7 +799,7 @@ Describe "Argument Passing - EXE Targets" {
         }
 
         It "Should pass /i flag to findstr for case-insensitive search" -Skip:(-not $script:ExeLinksCreated) {
-            $tempFile = Join-Path $env:TEMP "findstr_test_$(Get-Random).txt"
+            $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "findstr_test_$(Get-Random).txt"
             "line one`nline TWO`nline three" | Set-Content $tempFile
 
             try {
@@ -820,7 +820,7 @@ Describe "Argument Passing - EXE Targets" {
     Context "EXE with Complex Arguments" {
         It "Should handle quoted paths with spaces for EXE" -Skip:(-not $script:ExeLinksCreated) {
             # Test that paths with spaces work
-            $tempDir = Join-Path $env:TEMP "PowerStub Test Dir $(Get-Random)"
+            $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "PowerStub Test Dir $(Get-Random)"
             $tempFile = Join-Path $tempDir "test.txt"
 
             try {
