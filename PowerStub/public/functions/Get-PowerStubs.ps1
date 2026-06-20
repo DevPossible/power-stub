@@ -25,5 +25,6 @@
 #>
 
 function Get-PowerStubs {
+    Sync-PowerStubConfiguration
     return (Get-PowerStubConfigurationKey 'Stubs')
 }

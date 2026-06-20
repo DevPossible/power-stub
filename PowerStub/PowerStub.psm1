@@ -71,6 +71,7 @@ $StubCompleter = {
     # Virtual verbs (reserved commands)
     $virtualVerbs = @('search', 'help', 'update')
 
+    Sync-PowerStubConfiguration
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
     $allOptions = @($virtualVerbs) + @($stubs.Keys)
 
@@ -95,6 +96,7 @@ $CommandCompleter = {
     # Handle virtual verb completions
     if ($stub -eq 'help') {
         # For 'help' verb, the command parameter should show stub names
+        Sync-PowerStubConfiguration
         $stubs = Get-PowerStubConfigurationKey 'Stubs'
         $stubNames = @($stubs.Keys)
         if (!$stringMatch) { return $stubNames }
@@ -108,6 +110,7 @@ $CommandCompleter = {
 
     if ($stub -eq 'update') {
         # For 'update' verb, the command parameter should show stub names (or empty for all)
+        Sync-PowerStubConfiguration
         $stubs = Get-PowerStubConfigurationKey 'Stubs'
         $stubNames = @($stubs.Keys)
         if (!$stringMatch) { return $stubNames }

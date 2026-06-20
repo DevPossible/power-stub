@@ -82,12 +82,34 @@ function Import-PowerStubConfiguration {
 
     if ($configToLoad) {
         Write-Verbose "Importing File: $configToLoad"
-        $newConfig = Get-Content -Path $configToLoad -Raw | ConvertFrom-Json | ConvertTo-Hashtable
+        try {
+            $configJson = Get-Content -LiteralPath $configToLoad -Raw -ErrorAction Stop
+        }
+        catch {
+            if (-not (Test-Path -LiteralPath $configToLoad)) {
+                Write-Verbose "Configuration file disappeared before it could be read: $configToLoad"
+                return
+            }
+            throw
+        }
+
+        $newConfig = $configJson | ConvertFrom-Json | ConvertTo-Hashtable
         foreach ($key in $newConfig.Keys) {
             #do not import values for internal keys
             if ($noImport -contains $key) { continue }
             Write-Verbose "Importing Configuration Key: $key"
             $Script:PSTBSettings[$key] = $newConfig[$key]
+        }
+        try {
+            $Script:PSTBSettings['ConfigFileLastWriteUtc'] = (Get-Item -LiteralPath $configToLoad -ErrorAction Stop).LastWriteTimeUtc
+        }
+        catch {
+            if (-not (Test-Path -LiteralPath $configToLoad)) {
+                Write-Verbose "Configuration file disappeared after it was read: $configToLoad"
+            }
+            else {
+                throw
+            }
         }
     }
     else {

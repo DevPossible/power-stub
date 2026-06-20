@@ -48,6 +48,7 @@ function Export-PowerStubConfiguration {
         # Atomic write: write to a process-unique temp file, then rename into place.
         $exportConfig | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tempFile -Encoding UTF8
         Move-Item -LiteralPath $tempFile -Destination $fileName -Force
+        $Script:PSTBSettings['ConfigFileLastWriteUtc'] = (Get-Item -LiteralPath $fileName).LastWriteTimeUtc
     }
     finally {
         if (Test-Path -LiteralPath $tempFile) {

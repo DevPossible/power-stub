@@ -32,6 +32,8 @@ function Remove-PowerStub {
     param(
         [string]$name
     )
+
+    Sync-PowerStubConfiguration
     
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
     if (-not $stubs.ContainsKey($name)) {

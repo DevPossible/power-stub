@@ -48,6 +48,8 @@ function New-PowerStubDirectAlias {
         [switch]$Force
     )
 
+    Sync-PowerStubConfiguration
+
     # Verify stub exists
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
     if (-not ($stubs.Keys -contains $Stub)) {
