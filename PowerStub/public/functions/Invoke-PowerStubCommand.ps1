@@ -85,6 +85,8 @@ function Invoke-PowerStubCommand {
     end {
         Write-Debug "Invoke-PowerStubCommand Process"
 
+        Sync-PowerStubConfiguration
+
         if (!$stub) {
             Show-PowerStubOverview
             return

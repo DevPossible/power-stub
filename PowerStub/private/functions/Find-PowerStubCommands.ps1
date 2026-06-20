@@ -31,6 +31,8 @@ function Find-PowerStubCommands {
     param(
         [string]$stub
     )
+    Sync-PowerStubConfiguration
+
     $alpha = Get-PowerStubConfigurationKey 'EnablePrefix:Alpha'
     $beta = Get-PowerStubConfigurationKey 'EnablePrefix:Beta'
     $stubs = Get-PowerStubConfigurationKey 'Stubs'

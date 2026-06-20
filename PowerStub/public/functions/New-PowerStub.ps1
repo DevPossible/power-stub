@@ -47,6 +47,8 @@ function New-PowerStub {
         [switch]$force
     )
 
+    Sync-PowerStubConfiguration
+
     #check to see if the path is already registered
     $stubs = Get-PowerStubConfigurationKey 'Stubs'
 

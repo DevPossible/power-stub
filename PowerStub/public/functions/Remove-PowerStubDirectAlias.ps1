@@ -26,6 +26,8 @@ function Remove-PowerStubDirectAlias {
         [string]$AliasName
     )
 
+    Sync-PowerStubConfiguration
+
     # Check if the alias exists in our config
     $directAliases = Get-PowerStubConfigurationKey 'DirectAliases'
     if (-not $directAliases -or -not $directAliases.ContainsKey($AliasName)) {

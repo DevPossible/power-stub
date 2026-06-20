@@ -37,6 +37,8 @@ function Get-PowerStubConfiguration {
     param (
         [string] $key
     )
+
+    Sync-PowerStubConfiguration
     
     if ($key) {
         return $Script:PSTBSettings[$key]
