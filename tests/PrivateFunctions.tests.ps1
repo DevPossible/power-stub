@@ -526,6 +526,66 @@ Describe "Export-PowerStubConfiguration" {
                 }
             }
         }
+
+        It "Export-PowerStubConfiguration_ExternalProcessRegistration_IsVisibleInLoadedSession" {
+            $tempRoot = Join-Path $env:TEMP "PSTBExternalConfigTest_$(Get-Random)"
+            $tempAppData = Join-Path $tempRoot 'appdata'
+            $stubPath = Join-Path $tempRoot 'stub'
+            $mainScript = Join-Path $tempRoot 'main.ps1'
+            $childScript = Join-Path $tempRoot 'register-child.ps1'
+            $modulePath = Join-Path $PSScriptRoot '..\PowerStub\PowerStub.psm1'
+
+            try {
+                New-Item -ItemType Directory -Path $tempRoot, $tempAppData -Force | Out-Null
+
+                @'
+param(
+    [string]$ModulePath,
+    [string]$AppData,
+    [string]$StubPath
+)
+
+$env:APPDATA = $AppData
+Import-Module $ModulePath -Force
+New-PowerStub -Name ExternalStub -Path $StubPath -Force
+'@ | Set-Content -LiteralPath $childScript -Encoding UTF8
+
+                @'
+param(
+    [string]$ModulePath,
+    [string]$AppData,
+    [string]$StubPath,
+    [string]$ChildScript
+)
+
+$env:APPDATA = $AppData
+Import-Module $ModulePath -Force
+$initialCount = @((Get-PowerStubs).Keys).Count
+Start-Sleep -Milliseconds 50
+& pwsh -NoProfile -File $ChildScript -ModulePath $ModulePath -AppData $AppData -StubPath $StubPath
+$stubs = Get-PowerStubs
+
+[PSCustomObject]@{
+    InitialCount     = $initialCount
+    HasExternalStub  = $stubs.ContainsKey('ExternalStub')
+    FinalCount       = @($stubs.Keys).Count
+} | ConvertTo-Json -Compress
+'@ | Set-Content -LiteralPath $mainScript -Encoding UTF8
+
+                $result = & pwsh -NoProfile -File $mainScript -ModulePath $modulePath -AppData $tempAppData -StubPath $stubPath -ChildScript $childScript |
+                    Select-Object -Last 1 |
+                    ConvertFrom-Json
+
+                $result.InitialCount | Should -Be 0
+                $result.HasExternalStub | Should -Be $true
+                $result.FinalCount | Should -Be 1
+            }
+            finally {
+                if (Test-Path -LiteralPath $tempRoot) {
+                    Remove-Item -LiteralPath $tempRoot -Recurse -Force
+                }
+            }
+        }
     }
 }
 

@@ -31,13 +31,14 @@ function Get-PowerStubConfigurationDefaults {
         'ModulePath'         = $Script:ModulePath
         'ConfigFile'         = Join-Path $configDir 'config.json'
         'LegacyConfigFile'   = Join-Path $Script:ModulePath 'PowerStub.json'
-        'InternalConfigKeys' = @('InternalConfigKeys', 'ModulePath', 'ConfigFile', 'LegacyConfigFile', 'GitAvailable')
+        'InternalConfigKeys' = @('InternalConfigKeys', 'ModulePath', 'ConfigFile', 'LegacyConfigFile', 'GitAvailable', 'ConfigFileLastWriteUtc')
         'InvokeAlias'        = 'pstb'
         'Stubs'              = @{}
         'EnablePrefix:Alpha' = $false
         'EnablePrefix:Beta'  = $false
         'GitEnabled'         = $true
         'GitAvailable'       = $false
+        'ConfigFileLastWriteUtc' = $null
     }
 
     return $defaults
