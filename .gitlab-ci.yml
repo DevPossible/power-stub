@@ -1,0 +1,306 @@
+# Release pipeline for PowerStub.
+# Mirrors the Azure DevOps release pipeline:
+# validate GitHub access, test, calculate version/changelog, tag, mirror to GitHub,
+# publish to PowerShell Gallery, and create the GitHub release.
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
+
+stages:
+  - validate
+  - test
+  - version
+  - mirror
+  - publish
+  - release
+
+variables:
+  GIT_DEPTH: "0"
+  MODULE_PATH: "$CI_PROJECT_DIR/PowerStub"
+  TEST_RESULTS_PATH: "$CI_PROJECT_DIR/TestResults"
+  GITHUB_REPO: "DevPossible/power-stub"
+  POWERSHELL_TELEMETRY_OPTOUT: "1"
+
+.powershell:
+  image: mcr.microsoft.com/powershell:latest
+  before_script:
+    - pwsh --version
+
+validate_github:
+  stage: validate
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl git
+  script:
+    - |
+      set -eu
+
+      if [ -z "${GITHUB_PAT:-}" ]; then
+        echo "GITHUB_PAT is not set. Add it as a masked/protected GitLab CI/CD variable."
+        exit 1
+      fi
+
+      echo "GITHUB_PAT is set."
+      response="$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token ${GITHUB_PAT}" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/${GITHUB_REPO}")"
+
+      if [ "$response" != "200" ]; then
+        echo "GitHub API access failed: HTTP ${response}"
+        echo "Check that GITHUB_PAT can read ${GITHUB_REPO}."
+        exit 1
+      fi
+
+      git ls-remote "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git" HEAD >/dev/null
+      echo "GitHub access validation passed."
+
+test:
+  stage: test
+  extends: .powershell
+  script:
+    - |
+      pwsh -NoProfile -Command '
+        $ErrorActionPreference = "Stop"
+
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+        Install-Module -Name Pester -MinimumVersion 5.0 -Force -SkipPublisherCheck
+
+        $manifest = Test-ModuleManifest -Path "$env:MODULE_PATH/PowerStub.psd1" -Verbose
+        Write-Host "Module: $($manifest.Name)"
+        Write-Host "Version: $($manifest.Version)"
+        Write-Host "Author: $($manifest.Author)"
+
+        New-Item -Path $env:TEST_RESULTS_PATH -ItemType Directory -Force | Out-Null
+
+        $config = New-PesterConfiguration
+        $config.Run.Path = "$env:CI_PROJECT_DIR/tests"
+        $config.Run.Exit = $true
+        $config.Output.Verbosity = "Detailed"
+        $config.TestResult.Enabled = $true
+        $config.TestResult.OutputPath = "$env:TEST_RESULTS_PATH/testResults.xml"
+        $config.TestResult.OutputFormat = "NUnitXml"
+
+        Import-Module "$env:MODULE_PATH/PowerStub.psm1" -Force
+        Invoke-Pester -Configuration $config
+      '
+  artifacts:
+    when: always
+    reports:
+      junit: TestResults/testResults.xml
+    paths:
+      - TestResults/testResults.xml
+    expire_in: 30 days
+
+version:
+  stage: version
+  extends: .powershell
+  needs:
+    - test
+  script:
+    - |
+      pwsh -NoProfile -Command '
+        $ErrorActionPreference = "Stop"
+
+        Write-Host "HEAD: $(git rev-parse HEAD)"
+        Write-Host "Branch: $env:CI_COMMIT_BRANCH"
+        Write-Host "Tags at HEAD: $(git tag --points-at HEAD)"
+        Write-Host "Last tag: $(git describe --tags --abbrev=0 2>$null)"
+
+        $existingTag = git tag --points-at HEAD | Where-Object { $_ -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1
+
+        $tagExists = "false"
+        $shouldRelease = "true"
+
+        if ($existingTag) {
+            $version = $existingTag -replace "^v", ""
+            $tagExists = "true"
+        }
+        else {
+            $version = & "$env:CI_PROJECT_DIR/scripts/get-version.ps1"
+
+            $tagMatch = git tag -l "v$version"
+            if ($tagMatch) {
+                $tagCommit = git rev-list -1 "v$version"
+                $headCommit = git rev-parse HEAD
+
+                if ($tagCommit -eq $headCommit) {
+                    $shouldRelease = "false"
+                }
+                else {
+                    $parts = $version -split "\."
+                    $major = [int]$parts[0]
+                    $minor = [int]$parts[1]
+                    $patch = [int]$parts[2]
+
+                    do {
+                        $patch++
+                    } while (git tag -l "v$major.$minor.$patch")
+
+                    $version = "$major.$minor.$patch"
+                }
+            }
+        }
+
+        $lastTag = git describe --tags --abbrev=0 "HEAD^" 2>$null
+        if (-not $lastTag) {
+            $lastTag = git describe --tags --abbrev=0 2>$null
+        }
+
+        if ($lastTag) {
+            $commits = git log "$lastTag..HEAD" --pretty=format:"- %s" --reverse
+            $compareUrl = "https://github.com/$env:GITHUB_REPO/compare/${lastTag}...v${version}"
+        }
+        else {
+            $commits = git log --pretty=format:"- %s" --reverse | Select-Object -First 50
+            $compareUrl = "https://github.com/$env:GITHUB_REPO/commits/v${version}"
+        }
+
+        $changelog = @"
+## Whats Changed
+
+$($commits -join "`n")
+
+**Full Changelog**: $compareUrl
+"@
+
+        $changelog | Set-Content -Path "$env:CI_PROJECT_DIR/changelog.md" -Encoding UTF8
+
+        @(
+            "VERSION=$version"
+            "TAG_EXISTS=$tagExists"
+            "SHOULD_RELEASE=$shouldRelease"
+        ) | Set-Content -Path "$env:CI_PROJECT_DIR/release.env" -Encoding UTF8
+
+        Write-Host "VERSION=$version"
+        Write-Host "TAG_EXISTS=$tagExists"
+        Write-Host "SHOULD_RELEASE=$shouldRelease"
+      '
+  artifacts:
+    reports:
+      dotenv: release.env
+    paths:
+      - changelog.md
+      - release.env
+    expire_in: 30 days
+
+mirror:
+  stage: mirror
+  image: alpine:latest
+  needs:
+    - job: version
+      artifacts: true
+  before_script:
+    - apk add --no-cache git
+  script:
+    - |
+      set -eu
+
+      if [ "$SHOULD_RELEASE" != "true" ]; then
+        echo "No release needed for v${VERSION}."
+        exit 0
+      fi
+
+      git config user.email "gitlab-ci@devpossible.com"
+      git config user.name "GitLab CI"
+
+      if [ "$TAG_EXISTS" != "true" ]; then
+        git tag -a "v${VERSION}" -m "Release v${VERSION}"
+
+        if [ -z "${GITLAB_PUSH_TOKEN:-}" ]; then
+          echo "GITLAB_PUSH_TOKEN is required to push release tags back to GitLab."
+          echo "Create a masked/protected project or group access token with write_repository scope."
+          exit 1
+        fi
+
+        git remote set-url origin "https://oauth2:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+        git push origin "v${VERSION}"
+      else
+        echo "Tag v${VERSION} already exists."
+      fi
+
+      git remote add github "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git" 2>/dev/null \
+        || git remote set-url github "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git"
+
+      git push github "HEAD:${CI_COMMIT_BRANCH}" --force
+      git push github "v${VERSION}"
+
+publish:
+  stage: publish
+  extends: .powershell
+  needs:
+    - job: version
+      artifacts: true
+  script:
+    - |
+      pwsh -NoProfile -Command '
+        $ErrorActionPreference = "Stop"
+
+        if ($env:SHOULD_RELEASE -ne "true") {
+            Write-Host "No release needed for v$env:VERSION."
+            return
+        }
+
+        if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) {
+            throw "PSGALLERY_API_KEY is not set. Add it as a masked/protected GitLab CI/CD variable."
+        }
+
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+        Update-ModuleManifest -Path "$env:MODULE_PATH/PowerStub.psd1" -ModuleVersion $env:VERSION
+
+        $existing = Find-Module -Name PowerStub -RequiredVersion $env:VERSION -Repository PSGallery -ErrorAction SilentlyContinue
+        if ($existing) {
+            Write-Host "PowerStub v$env:VERSION is already published to PSGallery. Skipping."
+            return
+        }
+
+        Publish-Module -Path $env:MODULE_PATH -NuGetApiKey $env:PSGALLERY_API_KEY -Verbose
+      '
+
+github_release:
+  stage: release
+  image: alpine:latest
+  needs:
+    - job: version
+      artifacts: true
+    - mirror
+    - publish
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      set -eu
+
+      if [ "$SHOULD_RELEASE" != "true" ]; then
+        echo "No release needed for v${VERSION}."
+        exit 0
+      fi
+
+      body="$(jq -Rs . < changelog.md)"
+      payload="$(jq -n \
+        --arg tag "v${VERSION}" \
+        --arg name "PowerStub v${VERSION}" \
+        --argjson body "${body}" \
+        '{ tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false }')"
+
+      status="$(curl -s -o response.json -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: token ${GITHUB_PAT}" \
+        -H "Accept: application/vnd.github.v3+json" \
+        -H "Content-Type: application/json" \
+        "https://api.github.com/repos/${GITHUB_REPO}/releases" \
+        -d "${payload}")"
+
+      if [ "$status" = "201" ]; then
+        echo "Created GitHub release v${VERSION}."
+      elif [ "$status" = "422" ]; then
+        echo "GitHub release v${VERSION} already exists. Treating as success."
+        cat response.json
+      else
+        echo "Failed to create GitHub release. HTTP ${status}"
+        cat response.json
+        exit 1
+      fi
