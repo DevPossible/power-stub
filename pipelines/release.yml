@@ -1,16 +1,9 @@
 # Release Pipeline for PowerStub
-# Triggers on push to main branch
+# Azure DevOps release pipeline is disabled.
+# GitLab CI is now the active release pipeline.
 # Builds, tests, mirrors to GitHub, publishes to PSGallery, creates GitHub release
 
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    exclude:
-      - '*.md'
-      - 'docs/**'
-
+trigger: none
 pr: none
 
 variables:
