@@ -263,11 +263,18 @@ Describe "Argument Passing - PS1 Targets" {
     # -------------------------------------------------------------------------
     Context "Variable Expansion" {
         It "Should expand environment variable" {
-            $output = pstb SampleStub arg-echo $env:COMPUTERNAME
-            $result = Get-ArgEchoResult $output
+            $env:POWERSTUB_TEST_ENV_VAR = "powerstub_env_value"
 
-            $result.ArgCount | Should -Be 1
-            $result.Args[0].Value | Should -Be $env:COMPUTERNAME
+            try {
+                $output = pstb SampleStub arg-echo $env:POWERSTUB_TEST_ENV_VAR
+                $result = Get-ArgEchoResult $output
+
+                $result.ArgCount | Should -Be 1
+                $result.Args[0].Value | Should -Be $env:POWERSTUB_TEST_ENV_VAR
+            }
+            finally {
+                Remove-Item Env:\POWERSTUB_TEST_ENV_VAR -ErrorAction SilentlyContinue
+            }
         }
 
         It "Should expand script variable" {
